@@ -1,5 +1,10 @@
 import './globals.css'
 
+export const metadata = {
+  title: 'Dashboard de Performance',
+  description: 'Gerenciamento de Meta Ads',
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -7,7 +12,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-br">
-      <body className="bg-[#0a051a]">{children}</body>
+      <body className="bg-[#0a051a]" suppressHydrationWarning={true}>
+        {children}
+      </body>
     </html>
   )
 }
