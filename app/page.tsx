@@ -1,111 +1,145 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+
+interface MetaData {
+  campanha: string;
+  gasto: number;
+  leads: number;
+  data_inicio: string;
+  CLIENTE: string;
+  squad: string;
+}
 
 export default function Dashboard() {
-  const [data, setData] = useState<any[]>([]);
-  const [clienteAtivo, setClienteAtivo] = useState<string>('Todos');
-  const [periodoAtivo, setPeriodoAtivo] = useState<string>('30');
+  const [data, setData] = useState<MetaData[]>([]);
+  const [clienteAtivo, setClienteAtivo] = useState('Todos');
+  const [squadAtiva, setSquadAtiva] = useState('Todos');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [periodoRapido, setPeriodoRapido] = useState('7');
 
   useEffect(() => {
     async function fetchData() {
       const { data: metaData } = await supabase.from('meta_ads').select('*');
-      if (metaData) setData(metaData);
+      if (metaData) setData(metaData as MetaData[]);
     }
     fetchData();
   }, []);
 
-  // Lógica de filtro (mantida)
   const dadosFiltrados = data.filter(item => {
     const dataItem = new Date(item.data_inicio + "T00:00:00");
+    let atendeData = false;
+    
+    if (dataInicio || dataFim) {
+      const inicio = dataInicio ? new Date(dataInicio + "T00:00:00") : null;
+      const fim = dataFim ? new Date(dataFim + "T23:59:59") : null;
+      atendeData = (!inicio || dataItem >= inicio) && (!fim || dataItem <= fim);
+    } else {
+      const limite = new Date();
+      limite.setDate(limite.getDate() - parseInt(periodoRapido));
+      atendeData = dataItem >= limite;
+    }
+
     const matchesCliente = clienteAtivo === 'Todos' || item.CLIENTE === clienteAtivo;
-    const dias = parseInt(periodoAtivo);
-    const dataLimite = new Date();
-    dataLimite.setDate(dataLimite.getDate() - dias);
-    return matchesCliente && dataItem >= dataLimite;
+    const matchesSquad = squadAtiva === 'Todos' || item.squad === squadAtiva;
+
+    return atendeData && matchesCliente && matchesSquad;
   });
 
   const totalGasto = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.gasto) || 0), 0);
   const totalLeads = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.leads) || 0), 0);
 
-  return (
-    // Fundo Roxo Escuro Profundo com Logo de Fundo Transparente
-    <main className="min-h-screen bg-[#0a051a] text-purple-50 p-6 md:p-12 relative overflow-hidden">
-      
-      {/* Logo de Fundo (Translúcida/Marca d'água) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.03] pointer-events-none">
-         <img src="/logo-empresa.png" alt="BG Logo" className="w-[600px]" />
-      </div>
+  const dadosAgrupados = Object.values(dadosFiltrados.reduce((acc: any, item) => {
+    const dia = item.data_inicio;
+    if (!acc[dia]) acc[dia] = { dia, gasto: 0 };
+    acc[dia].gasto += Number(item.gasto);
+    return acc;
+  }, {})).sort((a: any, b: any) => new Date(a.dia).getTime() - new Date(b.dia).getTime());
 
+  return (
+    <main className="min-h-screen p-6 md:p-12 bg-[#0a051a] text-purple-50 relative overflow-hidden">
       <div className="max-w-6xl mx-auto relative z-10">
-        
-        {/* HEADER COM LOGO */}
-        <header className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
-          <div className="flex items-center gap-4">
+        <header className="flex flex-col gap-8 mb-12 border-b border-purple-900/40 pb-10">
+          <div className="flex justify-between items-center w-full">
             <img src="/logo-empresa.png" alt="Logo" className="h-10 w-auto" />
-            <div className="h-8 w-[1px] bg-purple-800/50 hidden md:block"></div>
-            <h1 className="text-xl font-black uppercase tracking-widest text-purple-200">Insights Ads</h1>
+            
+            <div className="flex gap-4">
+              <select 
+                className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                onChange={(e) => setClienteAtivo(e.target.value)}
+              >
+                <option value="Todos">Clientes</option>
+                {[...new Set(data.map(i => i.CLIENTE))].filter(Boolean).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+
+              <select 
+                className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                onChange={(e) => setSquadAtiva(e.target.value)}
+              >
+                <option value="Todos">Squads</option>
+                {[...new Set(data.map(i => i.squad))].filter(Boolean).map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="flex gap-3">
-            <select 
-              className="bg-purple-900/40 border border-purple-700/50 p-2 rounded-xl text-sm outline-none text-purple-100 backdrop-blur-md"
-              onChange={(e) => setClienteAtivo(e.target.value)}
-            >
-              <option value="Todos">Todos os Clientes</option>
-              {Array.from(new Set(data.map(i => i.CLIENTE))).map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex bg-purple-900/30 p-1 rounded-xl border border-purple-700/50">
+              {['1', '7', '14'].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => { setPeriodoRapido(d); setDataInicio(''); setDataFim(''); }}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio ? 'bg-purple-600 text-black' : 'text-purple-400 hover:text-purple-200'}`}
+                >
+                  {d}D
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-4 bg-purple-900/20 px-4 py-2 rounded-xl border border-purple-700/30">
+              <div className="flex flex-col">
+                <span className="text-[8px] uppercase font-black text-purple-500 mb-1">Início</span>
+                <input type="date" value={dataInicio} className="bg-transparent text-white text-xs font-bold outline-none" onChange={(e) => { setDataInicio(e.target.value); setPeriodoRapido(''); }} />
+              </div>
+              <div className="flex flex-col ml-4">
+                <span className="text-[8px] uppercase font-black text-purple-500 mb-1">Fim</span>
+                <input type="date" value={dataFim} className="bg-transparent text-white text-xs font-bold outline-none" onChange={(e) => { setDataFim(e.target.value); setPeriodoRapido(''); }} />
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* FILTROS DE PERÍODO (Estilo Roxo Claro) */}
-        <div className="flex bg-purple-900/20 p-1 rounded-2xl border border-purple-800/30 mb-10 w-fit">
-          {['7', '14', '30'].map((d) => (
-            <button
-              key={d}
-              onClick={() => setPeriodoAtivo(d)}
-              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${periodoAtivo === d ? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'text-purple-400 hover:text-purple-200'}`}
-            >
-              {d} DIAS
-            </button>
-          ))}
-        </div>
-
-        {/* CARDS ROXOS TRANSPARENTES (Glassmorphism) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-          <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-            <p className="text-purple-400 text-xs font-black uppercase tracking-widest mb-2">Investimento</p>
-            <p className="text-5xl font-bold text-white tracking-tighter">
-              <span className="text-purple-500 text-2xl mr-1">R$</span>
-              {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
+          <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20">
+            <p className="text-purple-400 text-[10px] font-black uppercase mb-3">Investimento</p>
+            <p className="text-5xl font-bold italic text-white">R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
-          
-          <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-            <p className="text-purple-400 text-xs font-black uppercase tracking-widest mb-2">Resultados</p>
-            <p className="text-5xl font-bold text-white tracking-tighter">
-              {totalLeads} <span className="text-purple-500 text-2xl ml-1 text-purple-400">Leads</span>
-            </p>
+          <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20">
+            <p className="text-purple-400 text-[10px] font-black uppercase mb-3">Leads Gerados</p>
+            {/* REMOVIDO O "UN" */}
+            <p className="text-5xl font-bold italic text-white">{totalLeads}</p>
           </div>
         </div>
 
-        {/* GRÁFICO PERSONALIZADO */}
-        <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/10 h-[400px]">
-          <h2 className="text-xs font-black mb-10 uppercase tracking-widest text-purple-400">Evolução do Investimento</h2>
+        <div className="bg-purple-900/5 backdrop-blur-md p-8 rounded-[2rem] border border-purple-500/5 h-[450px]">
+          <h2 className="text-[10px] font-black mb-10 uppercase tracking-[0.3em] text-purple-600 text-center">Evolução de Performance Diária</h2>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={Object.values(dadosFiltrados.reduce((acc: any, item) => {
-                const dia = item.data_inicio;
-                if (!acc[dia]) acc[dia] = { dia, gasto: 0 };
-                acc[dia].gasto += Number(item.gasto);
-                return acc;
-              }, {})).sort((a: any, b: any) => new Date(a.dia).getTime() - new Date(b.dia).getTime())}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#3b0764" vertical={false} />
-              <XAxis dataKey="dia" stroke="#a855f7" fontSize={10} tickFormatter={(v) => v.split('-')[2] + '/' + v.split('-')[1]} />
-              <Tooltip 
-                cursor={{fill: 'rgba(168, 85, 247, 0.1)'}}
-                contentStyle={{ backgroundColor: '#1e1b4b', border: '1px solid #7e22ce', borderRadius: '15px' }}
+            <BarChart data={dadosAgrupados}>
+              {/* LEGENDA DAS DATAS EM BRANCO */}
+              <XAxis 
+                dataKey="dia" 
+                stroke="#ffffff" 
+                fontSize={11} 
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => v.split('-')[2] + '/' + v.split('-')[1]} 
               />
+              <Tooltip contentStyle={{ backgroundColor: '#0a051a', border: '1px solid #3b0764', borderRadius: '15px' }} />
               <Bar dataKey="gasto" fill="#a855f7" radius={[10, 10, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
