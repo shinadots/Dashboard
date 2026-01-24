@@ -51,7 +51,6 @@ export default function Dashboard() {
     return atendeData && matchesCliente && matchesSquad;
   });
 
-  // Variáveis definidas antes do return para evitar ReferenceError
   const totalGasto = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.gasto) || 0), 0);
   const totalLeads = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.leads) || 0), 0);
 
@@ -64,7 +63,6 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen p-6 md:p-12 bg-[#0a051a] text-purple-50 relative overflow-hidden font-sans">
-      {/* Imagem de fundo corrigida (usa path relativo ao public) */}
       <img src="/logo-empresa.png" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] opacity-[0.03] pointer-events-none z-0" alt="background" />
 
       <div className="max-w-6xl mx-auto relative z-10">
@@ -73,19 +71,20 @@ export default function Dashboard() {
             <img src="/logo-empresa.png" alt="Logo" className="h-10 w-auto" />
             
             <div className="flex gap-4">
+              {/* SELECTS: PRETO E NEGRITO */}
               <select 
                 className="bg-white text-black font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
                 onChange={(e) => setClienteAtivo(e.target.value)}
               >
                 <option value="Todos">Clientes</option>
-                {[...new Set(data.map(i => i.CLIENTE))].filter(Boolean).map(c => (
+                {[...new Set(data.map(i => i.CLIENTE))].filter(Boolean).sort().map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
-
+              
               <select 
-               className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
-                 onChange={(e) => setSquadAtiva(e.target.value)}
+                className="bg-white text-black font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                onChange={(e) => setSquadAtiva(e.target.value)}
               >
                 <option value="Todos">Squads</option>
                 {[...new Set(data.map(i => i.squad))].filter(Boolean).sort().map(s => (
@@ -153,23 +152,3 @@ export default function Dashboard() {
     </main>
   );
 }
-
-
-                
-              <select 
-                className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
-                onChange={(e) => setSquadAtiva(e.target.value)}
-              >
-                <option value="Todos">Squads</option>
-                {[...new Set(data.map(i => i.squad))].filter(Boolean).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex bg-purple-900/30 p-1 rounded-xl border border-purple-700/50">
-              {['1', '7', '14'].map((d) => (
-                <button
-                 
