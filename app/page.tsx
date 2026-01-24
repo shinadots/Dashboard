@@ -1,19 +1,20 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface MetaData {
   campanha: string;
   gasto: number;
   leads: number;
-  data: string;
-  cliente: string; // Nova coluna para separação
+  data_inicio: string; // Conforme sua imagem do Supabase
+  CLIENTE: string;     // Conforme sua imagem do Supabase
 }
 
 export default function Dashboard() {
   const [data, setData] = useState<MetaData[]>([]);
   const [clienteAtivo, setClienteAtivo] = useState<string>('Todos');
+  const [dataFiltro, setDataFiltro] = useState<string>(''); // Filtro de dia específico
 
   useEffect(() => {
     async function fetchData() {
@@ -23,82 +24,80 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // 1. Lógica de Filtro por Cliente
-  const clientes = ['Todos', ...Array.from(new Set(data.map(item => item.cliente).filter(Boolean)))];
-  const dadosFiltrados = clienteAtivo === 'Todos' ? data : data.filter(item => item.cliente === clienteAtivo);
+  // 1. Lógica de Filtro por Cliente (Corrigido para CLIENTE maiúsculo)
+  const clientes = ['Todos', ...Array.from(new Set(data.map(item => item.CLIENTE).filter(Boolean)))];
+  
+  const dadosFiltrados = data.filter(item => {
+    const matchesCliente = clienteAtivo === 'Todos' || item.CLIENTE === clienteAtivo;
+    const matchesData = !dataFiltro || item.data_inicio === dataFiltro;
+    return matchesCliente && matchesData;
+  });
 
-  // 2. Lógica do Gráfico (Agrupar gasto por dia)
+  // 2. Agrupamento para o Gráfico Diário
   const dadosGrafico = Object.values(dadosFiltrados.reduce((acc: any, item) => {
-    const dataFormatada = new Date(item.data).toLocaleDateString('pt-BR');
-    if (!acc[dataFormatada]) acc[dataFormatada] = { data: dataFormatada, gasto: 0 };
-    acc[dataFormatada].gasto += Number(item.gasto);
+    const dia = item.data_inicio;
+    if (!acc[dia]) acc[dia] = { dia, gasto: 0 };
+    acc[dia].gasto += Number(item.gasto);
     return acc;
-  }, {}));
+  }, {})).sort((a: any, b: any) => new Date(a.dia).getTime() - new Date(b.dia).getTime());
 
   const totalGasto = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.gasto) || 0), 0);
   const totalLeads = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.leads) || 0), 0);
 
   return (
-    <main className="min-h-screen bg-[#020617] text-slate-200 p-6">
+    <main className="min-h-screen bg-[#020617] text-slate-200 p-6 md:p-12">
       <div className="max-w-6xl mx-auto">
-        <header className="flex justify-between items-center mb-10 border-b border-slate-800 pb-6">
-          <h1 className="text-2xl font-bold text-white uppercase tracking-tighter">Performance Ads</h1>
+        <header className="flex flex-wrap gap-4 justify-between items-center mb-10 border-b border-slate-800 pb-8">
+          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Performance Ads</h1>
           
-          {/* SELETOR DE CLIENTE */}
-          <select 
-            className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm outline-none focus:border-blue-500"
-            onChange={(e) => setClienteAtivo(e.target.value)}
-          >
-            {clientes.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <div className="flex gap-3">
+            {/* FILTRO DE DATA */}
+            <input 
+              type="date"
+              className="bg-slate-900 border border-slate-700 p-2 rounded-xl text-sm outline-none focus:border-blue-500"
+              onChange={(e) => setDataFiltro(e.target.value)}
+            />
+            {/* SELETOR DE CLIENTE */}
+            <select 
+              className="bg-slate-900 border border-slate-700 p-2 rounded-xl text-sm outline-none focus:border-blue-500 min-w-[150px]"
+              onChange={(e) => setClienteAtivo(e.target.value)}
+            >
+              {clientes.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
         </header>
 
-        {/* CARDS PRINCIPAIS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
-            <p className="text-slate-500 text-xs font-bold uppercase mb-2">Investimento Total</p>
-            <p className="text-3xl font-bold text-white">R$ {totalGasto.toLocaleString('pt-BR')}</p>
+          <div className="bg-slate-900/80 p-8 rounded-3xl border border-slate-800 shadow-2xl">
+            <p className="text-blue-400 text-xs font-bold uppercase mb-2">Investimento Total</p>
+            <p className="text-4xl font-bold text-white font-mono">R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
-          <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
-            <p className="text-slate-500 text-xs font-bold uppercase mb-2">Leads Gerados</p>
-            <p className="text-3xl font-bold text-white">{totalLeads}</p>
+          <div className="bg-slate-900/80 p-8 rounded-3xl border border-slate-800 shadow-2xl">
+            <p className="text-emerald-400 text-xs font-bold uppercase mb-2">Total de Leads</p>
+            <p className="text-4xl font-bold text-white font-mono">{totalLeads}</p>
           </div>
         </div>
 
         {/* GRÁFICO DIÁRIO */}
-        <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 mb-10 h-[300px]">
-          <h2 className="text-sm font-bold mb-6 uppercase text-blue-400">Gasto Diário (R$)</h2>
+        <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800 mb-10 h-[350px]">
+          <h2 className="text-sm font-bold mb-8 uppercase text-slate-500">Evolução de Gastos por Dia</h2>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dadosGrafico}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="data" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                itemStyle={{ color: '#60a5fa' }}
+              <XAxis 
+                dataKey="dia" 
+                stroke="#64748b" 
+                fontSize={10} 
+                tickFormatter={(value) => new Date(value).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}
               />
-              <Bar dataKey="gasto" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <YAxis stroke="#64748b" fontSize={10} tickFormatter={(value) => `R$${value}`} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                labelStyle={{ color: '#fff', marginBottom: '4px' }}
+              />
+              <Bar dataKey="gasto" fill="#3b82f6" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-
-        {/* TABELA DETALHADA */}
-        <div className="bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden text-sm">
-          <table className="w-full text-left">
-            <thead className="bg-slate-800/50 text-slate-500 uppercase">
-              <tr>
-                <th className="p-4 font-bold">Campanha</th>
-                <th className="p-4 font-bold text-right">Investido</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {dadosFiltrados.map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="p-4 text-white font-medium">{item.campanha}</td>
-                  <td className="p-4 text-right text-slate-400 font-mono">R$ {Number(item.gasto).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </main>
