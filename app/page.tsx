@@ -82,7 +82,7 @@ export default function Dashboard() {
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
-              
+
               <select 
                className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
                  onChange={(e) => setSquadAtiva(e.target.value)}
@@ -172,24 +172,4 @@ export default function Dashboard() {
             <div className="flex bg-purple-900/30 p-1 rounded-xl border border-purple-700/50">
               {['1', '7', '14'].map((d) => (
                 <button
-                  key={d}
-                  onClick={() => { setPeriodoRapido(d); setDataInicio(''); setDataFim(''); }}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio ? 'bg-purple-600 text-black' : 'text-purple-400 hover:text-purple-200'}`}
-                >
-                  {d}D
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-4 bg-purple-900/20 px-4 py-2 rounded-xl border border-purple-700/30">
-              <div className="flex flex-col">
-                <span className="text-[8px] uppercase font-black text-purple-500 mb-1">Início</span>
-                <input type="date" value={dataInicio} className="bg-transparent text-white text-xs font-bold outline-none" onChange={(e) => { setDataInicio(e.target.value); setPeriodoRapido(''); }} />
-              </div>
-              <div className="flex flex-col ml-4">
-                <span className="text-[8px] uppercase font-black text-purple-500 mb-1">Fim</span>
-                <input type="date" value={dataFim} className="bg-transparent text-white text-xs font-bold outline-none" onChange={(e) => { setDataFim(e.target.value); setPeriodoRapido(''); }} />
-              </div>
-            </div>
-          </div>
-        </header>
+                 
