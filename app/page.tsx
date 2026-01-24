@@ -73,7 +73,7 @@ export default function Dashboard() {
             <div className="flex gap-4">
               {/* SELECTS: PRETO E NEGRITO */}
               <select 
-                className="flex bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-black font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                className="flex bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
                 onChange={(e) => setClienteAtivo(e.target.value)}
               >
                 <option value="Todos">Clientes</option>
@@ -83,7 +83,7 @@ export default function Dashboard() {
               </select>
               
               <select 
-                className="flex bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-black font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                className="flex bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
                 onChange={(e) => setSquadAtiva(e.target.value)}
               >
                 <option value="Todos">Squads</option>
