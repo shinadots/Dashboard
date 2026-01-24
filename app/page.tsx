@@ -18,8 +18,11 @@ export default function Dashboard() {
   const [periodoRapido, setPeriodoRapido] = useState('7');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
 
+  // Evita erro de Hydration do Next.js
   useEffect(() => {
+    setIsMounted(true);
     async function fetchData() {
       const { data: metaData } = await supabase.from('meta_ads').select('*');
       if (metaData) setData(metaData as MetaData[]);
@@ -36,7 +39,6 @@ export default function Dashboard() {
       const dataItem = new Date(item.data_inicio + "T00:00:00");
       let atendeData = false;
       
-      // LÓGICA DE FILTRO: DATA MANUAL OU PERÍODO RÁPIDO
       if (dataInicio || dataFim) {
         const inicio = dataInicio ? new Date(dataInicio + "T00:00:00") : null;
         const fim = dataFim ? new Date(dataFim + "T23:59:59") : null;
@@ -82,6 +84,8 @@ export default function Dashboard() {
     return acc;
   }, {})).sort((a: any, b: any) => new Date(a.dia).getTime() - new Date(b.dia).getTime());
 
+  if (!isMounted) return null;
+
   return (
     <main className="min-h-screen p-6 md:p-12 bg-[#0a051a] text-purple-50 relative overflow-hidden font-sans">
       <style>{`
@@ -106,17 +110,15 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-6">
-            {/* PERÍODOS RÁPIDOS */}
             <div className="flex bg-purple-900/30 p-1 rounded-full border border-purple-700/50">
               {['1', '7', '14'].map((d) => (
                 <button key={d} onClick={() => { setPeriodoRapido(d); setDataInicio(''); setDataFim(''); }} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-400 hover:text-purple-200'}`}>
-                  {d === '1' ? '1D' : `${d}D`}
+                  {d === '1' ? 'Hoje' : `${d}D`}
                 </button>
               ))}
             </div>
             
-            {/* SELEÇÃO DE DATA MANUAL */}
-            <div className="flex items-center gap-4 bg-purple-900/20 px-6 py-2 rounded-full border border-purple-700/30 shadow-inner">
+            <div className="flex items-center gap-4 bg-purple-900/20 px-6 py-2 rounded-full border border-purple-700/30">
                <input type="date" value={dataInicio} onChange={(e) => { setDataInicio(e.target.value); setPeriodoRapido(''); }} className="bg-transparent text-white text-[10px] font-bold outline-none uppercase cursor-pointer" />
                <div className="h-4 w-[1px] bg-purple-700/30"></div>
                <input type="date" value={dataFim} onChange={(e) => { setDataFim(e.target.value); setPeriodoRapido(''); }} className="bg-transparent text-white text-[10px] font-bold outline-none uppercase cursor-pointer" />
@@ -126,7 +128,6 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3 space-y-8">
-            {/* KPI CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-purple-900/10 backdrop-blur-xl p-6 rounded-[2rem] border border-purple-500/20 shadow-2xl text-center">
                 <p className="text-purple-400 text-[9px] font-black uppercase mb-2 tracking-widest">Investimento</p>
@@ -137,7 +138,7 @@ export default function Dashboard() {
                 <p className="text-4xl font-bold italic text-white leading-tight">{totalLeads}</p>
               </div>
               <div className={`p-6 rounded-[2rem] border backdrop-blur-xl shadow-2xl text-center transition-all ${totalSOS > 0 ? 'bg-red-900/20 border-red-500/40 animate-pulse-red' : 'bg-purple-900/10 border-purple-500/20'}`}>
-                <p className={`${totalSOS > 0 ? 'text-red-400' : 'text-purple-400'} text-[9px] font-black uppercase mb-2 tracking-widest`}>Clientes S.O.S</p>
+                <p className={`${totalSOS > 0 ? 'text-red-400' : 'text-purple-400'} text-[9px] font-black uppercase mb-2 tracking-widest`}>S.O.S (CPL Alto)</p>
                 <p className={`text-4xl font-bold italic leading-tight ${totalSOS > 0 ? 'text-red-500' : 'text-white'}`}>{totalSOS}</p>
               </div>
             </div>
@@ -170,7 +171,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-black italic uppercase leading-none mb-1 ${c.estourouMeta ? 'text-red-500' : 'text-purple-400'}`}>
-                        R$ {c.cpl.toFixed(2)} <span className="text-[7px] not-italic block opacity-70">CPL</span>
+                        R$ {c.cpl.toFixed(2)} <span className="text-[7px] not-italic block opacity-70 uppercase">CPL</span>
                       </p>
                       <p className="text-[9px] font-medium text-white/50">
                         R$ {c.gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
