@@ -138,7 +138,7 @@ export default function Dashboard() {
                 <p className="text-4xl font-bold italic text-white leading-tight">{totalLeads}</p>
               </div>
               <div className={`p-6 rounded-[2rem] border backdrop-blur-xl shadow-2xl text-center transition-all ${totalSOS > 0 ? 'bg-red-900/20 border-red-500/40 animate-pulse-red' : 'bg-purple-900/10 border-purple-500/20'}`}>
-                <p className={`${totalSOS > 0 ? 'text-red-400' : 'text-purple-400'} text-[9px] font-black uppercase mb-2 tracking-widest`}>S.O.S (CPL Alto)</p>
+                <p className={`${totalSOS > 0 ? 'text-red-400' : 'text-purple-400'} text-[9px] font-black uppercase mb-2 tracking-widest`}>Clientes S.O.S)</p>
                 <p className={`text-4xl font-bold italic leading-tight ${totalSOS > 0 ? 'text-red-500' : 'text-white'}`}>{totalSOS}</p>
               </div>
             </div>
