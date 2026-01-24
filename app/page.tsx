@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface MetaData {
   campanha: string;
@@ -38,7 +38,10 @@ export default function Dashboard() {
       atendeData = (!inicio || dataItem >= inicio) && (!fim || dataItem <= fim);
     } else {
       const limite = new Date();
-      limite.setDate(limite.getDate() - parseInt(periodoRapido));
+      // Ajuste para 1D: garante que pegue dados de hoje
+      const diasatras = periodoRapido === '1' ? 0 : parseInt(periodoRapido);
+      limite.setDate(limite.getDate() - diasatras);
+      limite.setHours(0, 0, 0, 0);
       atendeData = dataItem >= limite;
     }
 
@@ -48,6 +51,7 @@ export default function Dashboard() {
     return atendeData && matchesCliente && matchesSquad;
   });
 
+  // Variáveis definidas antes do return para evitar ReferenceError
   const totalGasto = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.gasto) || 0), 0);
   const totalLeads = dadosFiltrados.reduce((acc, curr) => acc + (Number(curr.leads) || 0), 0);
 
@@ -59,7 +63,10 @@ export default function Dashboard() {
   }, {})).sort((a: any, b: any) => new Date(a.dia).getTime() - new Date(b.dia).getTime());
 
   return (
-    <main className="min-h-screen p-6 md:p-12 bg-[#0a051a] text-purple-50 relative overflow-hidden">
+    <main className="min-h-screen p-6 md:p-12 bg-[#0a051a] text-purple-50 relative overflow-hidden font-sans">
+      {/* Imagem de fundo corrigida (usa path relativo ao public) */}
+      <img src="/logo-empresa.png" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] opacity-[0.03] pointer-events-none z-0" alt="background" />
+
       <div className="max-w-6xl mx-auto relative z-10">
         <header className="flex flex-col gap-8 mb-12 border-b border-purple-900/40 pb-10">
           <div className="flex justify-between items-center w-full">
@@ -67,21 +74,21 @@ export default function Dashboard() {
             
             <div className="flex gap-4">
               <select 
-                className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                className="bg-white text-black font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
                 onChange={(e) => setClienteAtivo(e.target.value)}
               >
                 <option value="Todos">Clientes</option>
-                {[...new Set(data.map(i => i.CLIENTE))].filter(Boolean).map(c => (
+                {[...new Set(data.map(i => i.CLIENTE))].filter(Boolean).sort().map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
 
               <select 
-                className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                className="bg-white text-black font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
                 onChange={(e) => setSquadAtiva(e.target.value)}
               >
                 <option value="Todos">Squads</option>
-                {[...new Set(data.map(i => i.squad))].filter(Boolean).map(s => (
+                {[...new Set(data.map(i => i.squad))].filter(Boolean).sort().map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -94,9 +101,9 @@ export default function Dashboard() {
                 <button
                   key={d}
                   onClick={() => { setPeriodoRapido(d); setDataInicio(''); setDataFim(''); }}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio ? 'bg-purple-600 text-black' : 'text-purple-400 hover:text-purple-200'}`}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio ? 'bg-purple-600 text-white' : 'text-purple-400 hover:text-purple-200'}`}
                 >
-                  {d}D
+                  {d === '1' ? 'Hoje' : `${d}D`}
                 </button>
               ))}
             </div>
@@ -116,12 +123,11 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20">
-            <p className="text-purple-400 text-[10px] font-black uppercase mb-3">Investimento</p>
+            <p className="text-purple-400 text-[10px] font-black uppercase mb-3 tracking-widest">Investimento Filtrado</p>
             <p className="text-5xl font-bold italic text-white">R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
           <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20">
-            <p className="text-purple-400 text-[10px] font-black uppercase mb-3">Leads Gerados</p>
-            {/* REMOVIDO O "UN" */}
+            <p className="text-purple-400 text-[10px] font-black uppercase mb-3 tracking-widest">Leads Gerados</p>
             <p className="text-5xl font-bold italic text-white">{totalLeads}</p>
           </div>
         </div>
@@ -130,7 +136,6 @@ export default function Dashboard() {
           <h2 className="text-[10px] font-black mb-10 uppercase tracking-[0.3em] text-purple-600 text-center">Evolução de Performance Diária</h2>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dadosAgrupados}>
-              {/* LEGENDA DAS DATAS EM BRANCO */}
               <XAxis 
                 dataKey="dia" 
                 stroke="#ffffff" 
