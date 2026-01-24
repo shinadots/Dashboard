@@ -8,6 +8,7 @@ interface MetaData {
   gasto: number;
   leads: number;
   data_inicio: string; 
+  data_fim: string;
   CLIENTE: string; // Ajustado para maiúsculo conforme seu banco
 }
 
