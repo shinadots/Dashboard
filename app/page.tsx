@@ -103,7 +103,7 @@ export default function Dashboard() {
         <header className="flex flex-col gap-8 mb-12 border-b border-purple-900/40 pb-10">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <img src="/logo-empresa.png" alt="Logo" className="h-10 w-auto" />
-            <select className="appearance-none bg-purple-900/40 backdrop-blur-md text-white font-bold py-2 px-8 rounded-full border border-purple-700/50 text-[10px] uppercase outline-none cursor-pointer hover:bg-purple-600 transition-all min-w-[200px] text-center shadow-lg" value={gestorAtivo} onChange={(e) => setGestorAtivo(e.target.value)}>
+            <select className="appearance-none bg-purple-900/40 backdrop-blur-md text-white font-bold py-2 px-8 rounded-full border border-purple-700/50 text-[10px] uppercase outline-none cursor-pointer hover:bg-purple-800 transition-all min-w-[200px] text-left shadow-lg" value={gestorAtivo} onChange={(e) => setGestorAtivo(e.target.value)}>
               <option value="Todos">Todos os Gestores</option>
               {opcoesGestores.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
