@@ -78,17 +78,17 @@ export default function Dashboard() {
                 onChange={(e) => setClienteAtivo(e.target.value)}
               >
                 <option value="Todos">Clientes</option>
-                {[...new Set(data.map(i => i.CLIENTE))].filter(Boolean).sort().map(c => (
+                {[...new Set(data.map(i => i.CLIENTE))].filter(Boolean).map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
 
               <select 
-                className="bg-white text-black font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
+                className=" bg-purple-900/30 p-1 rounded-xl border border-purple-700/50 text-white font-bold p-2 rounded-lg text-xs uppercase outline-none cursor-pointer"
                 onChange={(e) => setSquadAtiva(e.target.value)}
               >
                 <option value="Todos">Squads</option>
-                {[...new Set(data.map(i => i.squad))].filter(Boolean).sort().map(s => (
+                {[...new Set(data.map(i => i.squad))].filter(Boolean).map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -101,9 +101,9 @@ export default function Dashboard() {
                 <button
                   key={d}
                   onClick={() => { setPeriodoRapido(d); setDataInicio(''); setDataFim(''); }}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio ? 'bg-purple-600 text-white' : 'text-purple-400 hover:text-purple-200'}`}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio ? 'bg-purple-600 text-black' : 'text-purple-400 hover:text-purple-200'}`}
                 >
-                  {d === '1' ? 'Hoje' : `${d}D`}
+                  {d}D
                 </button>
               ))}
             </div>
@@ -120,36 +120,3 @@ export default function Dashboard() {
             </div>
           </div>
         </header>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-          <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20">
-            <p className="text-purple-400 text-[10px] font-black uppercase mb-3 tracking-widest">Investimento Filtrado</p>
-            <p className="text-5xl font-bold italic text-white">R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-          </div>
-          <div className="bg-purple-900/10 backdrop-blur-xl p-8 rounded-[2rem] border border-purple-500/20">
-            <p className="text-purple-400 text-[10px] font-black uppercase mb-3 tracking-widest">Leads Gerados</p>
-            <p className="text-5xl font-bold italic text-white">{totalLeads}</p>
-          </div>
-        </div>
-
-        <div className="bg-purple-900/5 backdrop-blur-md p-8 rounded-[2rem] border border-purple-500/5 h-[450px]">
-          <h2 className="text-[10px] font-black mb-10 uppercase tracking-[0.3em] text-purple-600 text-center">Evolução de Performance Diária</h2>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dadosAgrupados}>
-              <XAxis 
-                dataKey="dia" 
-                stroke="#ffffff" 
-                fontSize={11} 
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) => v.split('-')[2] + '/' + v.split('-')[1]} 
-              />
-              <Tooltip contentStyle={{ backgroundColor: '#0a051a', border: '1px solid #3b0764', borderRadius: '15px' }} />
-              <Bar dataKey="gasto" fill="#a855f7" radius={[10, 10, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </main>
-  );
-}
