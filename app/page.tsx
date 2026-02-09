@@ -14,7 +14,6 @@ import {
   LabelList
 } from 'recharts';
 import Image from 'next/image';
-import next from 'next';
 
 interface MetaData {
   gasto: any;
@@ -42,10 +41,10 @@ const CustomTooltip = ({ active, payload }: any) => {
           Leads: <span style={{ fontWeight: 'bold' }}>{data.leads}</span>
         </p>
         <p style={{ color: '#ffffff', fontSize: '11px', marginBottom: '4px' }}>
-          CPL: <span style={{ fontWeight: 'bold' }}>R$ {data.cpl}</span>
+          CPL: <span style={{ fontWeight: 'bold' }}>R$ {data.cpl.toFixed(2)}</span>
         </p>
         <p style={{ color: '#ffffff', fontSize: '11px' }}>
-          Investimento: <span style={{ fontWeight: 'bold' }}>R$ {data.gasto}</span>
+          Investimento: <span style={{ fontWeight: 'bold' }}>R$ {data.gasto.toFixed(2)}</span>
         </p>
       </div>
     );
@@ -73,9 +72,11 @@ export default function Dashboard() {
         const from = page * pageSize;
         const to = from + pageSize - 1;
 
+        // Adicionado filtros para evitar dados nulos
         const { data: metaData, error } = await supabase
           .from('meta_ads')
           .select('*')
+          .not('CLIENTE', 'is', null)
           .order('data_inicio', { ascending: false })
           .range(from, to);
 
@@ -158,9 +159,21 @@ export default function Dashboard() {
     return nomesUnicos.map(nome => {
       const registros = dadosFiltrados.filter(d => d.CLIENTE?.trim() === nome);
       const metaCpl = data.find(d => d.CLIENTE?.trim() === nome)?.["meta cpl"] || 0;
-      const gasto = registros.reduce((acc, curr) => acc + Number(curr.gasto || 0), 0);
-      const leads = registros.reduce((acc, curr) => acc + Number(curr.leads || 0), 0);
-      const cpl = leads > 0 ? gasto / leads : (gasto > 0 ? gasto : 0);
+      
+      // CORREÇÃO: Garantir que valores sejam números válidos
+      const gasto = registros.reduce((acc, curr) => {
+        const valor = parseFloat(String(curr.gasto || 0));
+        return acc + (isNaN(valor) ? 0 : valor);
+      }, 0);
+      
+      const leads = registros.reduce((acc, curr) => {
+        const valor = parseInt(String(curr.leads || 0));
+        return acc + (isNaN(valor) ? 0 : valor);
+      }, 0);
+      
+      // CORREÇÃO: Prevenir divisão por zero e NaN
+      const cpl = leads > 0 ? gasto / leads : 0;
+      
       return {
         nome,
         gasto: parseFloat(gasto.toFixed(2)),
@@ -183,8 +196,17 @@ export default function Dashboard() {
     return todosClientes;
   }, [todosClientes, gestorAtivo]);
 
-  const totalGasto = dadosFiltrados.reduce((acc, curr) => acc + Number(curr.gasto || 0), 0);
-  const totalLeads = dadosFiltrados.reduce((acc, curr) => acc + Number(curr.leads || 0), 0);
+  // CORREÇÃO: Validação nos totais
+  const totalGasto = dadosFiltrados.reduce((acc, curr) => {
+    const valor = parseFloat(String(curr.gasto || 0));
+    return acc + (isNaN(valor) ? 0 : valor);
+  }, 0);
+  
+  const totalLeads = dadosFiltrados.reduce((acc, curr) => {
+    const valor = parseInt(String(curr.leads || 0));
+    return acc + (isNaN(valor) ? 0 : valor);
+  }, 0);
+  
   const totalSOS = todosClientes.filter(c => c.estourouMeta).length;
 
 
@@ -264,7 +286,9 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-purple-900/10 backdrop-blur-xl p-6 rounded-[2rem] border border-purple-500/20 text-center">
                 <p className="text-purple-400 text-[9px] font-black uppercase mb-2 tracking-widest">Investimento</p>
-                <p className="text-3xl font-bold italic text-white">R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p className="text-3xl font-bold italic text-white">
+                  R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
               </div>
               <div className="bg-purple-900/10 backdrop-blur-xl p-6 rounded-[2rem] border border-purple-500/20 text-center">
                 <p className="text-purple-400 text-[9px] font-black uppercase mb-2 tracking-widest">Leads Gerados</p>
@@ -307,7 +331,7 @@ export default function Dashboard() {
                     {clientesGrafico.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.estourouMeta ? '#ef4444' : '#4b2a85'} />
                     ))}
-                    <LabelList dataKey="cpl" position="top" fill="#fff" fontSize={9} formatter={(v: any) => `R$${v}`} />
+                    <LabelList dataKey="cpl" position="top" fill="#fff" fontSize={9} formatter={(v: any) => `R$${Number(v).toFixed(2)}`} />
                   </Bar>
 
                   <Line yAxisId="right" type="monotone" dataKey="gasto" name="gasto" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
