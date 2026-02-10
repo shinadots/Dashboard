@@ -225,12 +225,12 @@ export default function Dashboard() {
           alt="Logo Empresa"
           width={600}
           height={200}
-          className="w-[50%] max-w-[600px] h-auto"
+          className="w-[50%] max-w-[800px] h-auto"
           priority
         />
       </div>
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="max-w-[1800px] mx-auto relative z-10">
         <header className="flex flex-col gap-8 mb-12 border-b border-purple-900/40 pb-10">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <Image
