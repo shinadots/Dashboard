@@ -219,7 +219,7 @@ export default function Dashboard() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b2a85; border-radius: 10px; }
       `}</style>
 
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center">
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.40] flex items-center justify-center">
         <Image
           src="/logo-empresa.png"
           alt="Logo Empresa"
