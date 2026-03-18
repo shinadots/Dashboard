@@ -15,13 +15,9 @@ import {
 } from 'recharts';
 import Image from 'next/image';
 
+// Interface genérica para suportar os dois formatos
 interface AdsData {
-  gasto: any;
-  leads: any;
-  data_inicio: string;
-  CLIENTE: string;
-  Gestor: string;
-  "meta cpl"?: number;
+  [key: string]: any;
 }
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -34,11 +30,9 @@ const CustomTooltip = ({ active, payload }: any) => {
         borderRadius: '20px',
         padding: '12px 16px'
       }}>
-        <p style={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>
-          {data.nome}
-        </p>
+        <p style={{ color: '#ffffff', fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>{data.nome}</p>
         <p style={{ color: '#ffffff', fontSize: '11px', marginBottom: '4px' }}>
-          Leads/Conv: <span style={{ fontWeight: 'bold' }}>{data.leads}</span>
+          Resultado: <span style={{ fontWeight: 'bold' }}>{data.leads}</span>
         </p>
         <p style={{ color: '#ffffff', fontSize: '11px', marginBottom: '4px' }}>
           CPL: <span style={{ fontWeight: 'bold' }}>R$ {data.cpl.toFixed(2)}</span>
@@ -54,13 +48,35 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export default function Dashboard() {
   const [data, setData] = useState<AdsData[]>([]);
-  const [plataforma, setPlataforma] = useState<'meta_ads' | 'google_ads'>('meta_ads'); // NOVA ABA
+  const [plataforma, setPlataforma] = useState<'meta_ads' | 'google_ads'>('meta_ads');
   const [gestorAtivo, setGestorAtivo] = useState('Todos');
   const [periodoRapido, setPeriodoRapido] = useState('7');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // MAPEAMENTO DE COLUNAS (DE ACORDO COM SEU SQL)
+  const cols = useMemo(() => {
+    if (plataforma === 'google_ads') {
+      return {
+        cliente: 'cliente',
+        gestor: 'gestor',
+        gasto: 'gastoTotal',
+        leads: 'leadsTotal',
+        data: 'dataInicio',
+        meta: 'meta'
+      };
+    }
+    return {
+      cliente: 'CLIENTE',
+      gestor: 'Gestor',
+      gasto: 'gasto',
+      leads: 'leads',
+      data: 'data_inicio',
+      meta: 'meta cpl'
+    };
+  }, [plataforma]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -76,14 +92,13 @@ export default function Dashboard() {
         const to = from + pageSize - 1;
 
         const { data: adsData, error } = await supabase
-          .from(plataforma) // USA A PLATAFORMA SELECIONADA
+          .from(plataforma)
           .select('*')
-          .not('CLIENTE', 'is', null)
-          .order('data_inicio', { ascending: false })
+          .not(cols.cliente, 'is', null)
           .range(from, to);
 
         if (error) {
-          console.error('Erro ao carregar dados:', error);
+          console.error('Erro:', error);
           hasMore = false;
         } else if (adsData && adsData.length > 0) {
           allData = [...allData, ...adsData];
@@ -93,17 +108,16 @@ export default function Dashboard() {
           hasMore = false;
         }
       }
-
-      setData(allData as AdsData[]);
+      setData(allData);
       setLoading(false);
     }
     fetchData();
-  }, [plataforma]); // RECARREGA QUANDO TROCAR A ABA
+  }, [plataforma, cols]);
 
   const opcoesGestores = useMemo(() => {
-    const gestores = data.map(i => i.Gestor?.trim()).filter(Boolean);
+    const gestores = data.map(i => i[cols.gestor]?.trim()).filter(Boolean);
     return [...new Set(gestores)].sort();
-  }, [data]);
+  }, [data, cols]);
 
   const dadosFiltrados = useMemo(() => {
     const formatDate = (d: Date): string => {
@@ -114,8 +128,9 @@ export default function Dashboard() {
     };
 
     return data.filter(item => {
-      if (!item.data_inicio) return false;
-      const itemDateStr = item.data_inicio.substring(0, 10);
+      const dateVal = item[cols.data];
+      if (!dateVal) return false;
+      const itemDateStr = dateVal.substring(0, 10);
       let atendeData = false;
 
       if (dataInicio || dataFim) {
@@ -130,19 +145,25 @@ export default function Dashboard() {
         dataInicial.setDate(hoje.getDate() - dias);
         atendeData = itemDateStr >= formatDate(dataInicial) && itemDateStr <= formatDate(dataFinal);
       }
-      return (gestorAtivo === 'Todos' || item.Gestor?.trim() === gestorAtivo) && atendeData;
+      return (gestorAtivo === 'Todos' || item[cols.gestor]?.trim() === gestorAtivo) && atendeData;
     });
-  }, [data, gestorAtivo, dataInicio, dataFim, periodoRapido]);
+  }, [data, gestorAtivo, dataInicio, dataFim, periodoRapido, cols]);
 
   const todosClientes = useMemo(() => {
-    const nomesUnicos = [...new Set(dadosFiltrados.map(i => i.CLIENTE?.trim()))].filter(Boolean);
+    const nomesUnicos = [...new Set(dadosFiltrados.map(i => i[cols.cliente]?.trim()))].filter(Boolean);
 
     return nomesUnicos.map(nome => {
-      const registros = dadosFiltrados.filter(d => d.CLIENTE?.trim() === nome);
-      const metaCpl = data.find(d => d.CLIENTE?.trim() === nome)?.["meta cpl"] || 0;
+      const registros = dadosFiltrados.filter(d => d[cols.cliente]?.trim() === nome);
       
-      const gasto = registros.reduce((acc, curr) => acc + (parseFloat(String(curr.gasto || 0)) || 0), 0);
-      const leads = registros.reduce((acc, curr) => acc + (parseInt(String(curr.leads || 0)) || 0), 0);
+      // Converte texto para número caso necessário (comum no Google Ads schema que você mandou)
+      const parseVal = (val: any) => {
+        if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0;
+        return parseFloat(val) || 0;
+      };
+
+      const gasto = registros.reduce((acc, curr) => acc + parseVal(curr[cols.gasto]), 0);
+      const leads = registros.reduce((acc, curr) => acc + parseVal(curr[cols.leads]), 0);
+      const metaValor = parseVal(registros[0][cols.meta]);
       const cpl = leads > 0 ? gasto / leads : 0;
       
       return {
@@ -150,18 +171,19 @@ export default function Dashboard() {
         gasto: parseFloat(gasto.toFixed(2)),
         leads,
         cpl: parseFloat(cpl.toFixed(2)),
-        meta: metaCpl,
-        estourouMeta: metaCpl > 0 && cpl > metaCpl
+        meta: metaValor,
+        estourouMeta: metaValor > 0 && cpl > metaValor
       };
     }).sort((a, b) => (a.estourouMeta === b.estourouMeta) ? b.gasto - a.gasto : a.estourouMeta ? -1 : 1);
-  }, [data, dadosFiltrados]);
+  }, [dadosFiltrados, cols]);
 
-  const clientesGrafico = useMemo(() => {
-    return gestorAtivo === 'Todos' ? todosClientes.filter(c => c.estourouMeta) : todosClientes;
-  }, [todosClientes, gestorAtivo]);
-
-  const totalGasto = dadosFiltrados.reduce((acc, curr) => acc + (parseFloat(String(curr.gasto || 0)) || 0), 0);
-  const totalLeads = dadosFiltrados.reduce((acc, curr) => acc + (parseInt(String(curr.leads || 0)) || 0), 0);
+  // Totais para os Cards
+  const parseValTotal = (val: any) => {
+    if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0;
+    return parseFloat(val) || 0;
+  };
+  const totalGasto = dadosFiltrados.reduce((acc, curr) => acc + parseValTotal(curr[cols.gasto]), 0);
+  const totalLeads = dadosFiltrados.reduce((acc, curr) => acc + parseValTotal(curr[cols.leads]), 0);
   const totalSOS = todosClientes.filter(c => c.estourouMeta).length;
 
   if (!isMounted) return null;
@@ -175,20 +197,15 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <Image src="/logo-empresa.png" alt="Logo" width={200} height={50} className="h-12 w-auto" />
             
-            {/* SELETOR DE PLATAFORMA (ABAS) */}
             <div className="flex bg-purple-900/40 p-1 rounded-xl border border-purple-700/50">
               <button 
                 onClick={() => setPlataforma('meta_ads')}
                 className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${plataforma === 'meta_ads' ? 'bg-blue-600 text-white shadow-lg' : 'text-purple-400 hover:text-white'}`}
-              >
-                Meta Ads
-              </button>
+              > Meta Ads </button>
               <button 
                 onClick={() => setPlataforma('google_ads')}
                 className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${plataforma === 'google_ads' ? 'bg-yellow-500 text-black shadow-lg' : 'text-purple-400 hover:text-white'}`}
-              >
-                Google Ads
-              </button>
+              > Google Ads </button>
             </div>
 
             <select
@@ -205,24 +222,16 @@ export default function Dashboard() {
             <div className="flex gap-6 items-center">
                 <div className="flex bg-purple-900/30 p-1 rounded-full border border-purple-700/50">
                 {['1', '7', '14'].map((d) => (
-                    <button
-                    key={d}
-                    onClick={() => { setPeriodoRapido(d); setDataInicio(''); setDataFim(''); }}
-                    className={`px-6 py-2 rounded-full text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio && !dataFim ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-400 hover:text-purple-200'}`}
-                    >
-                    {d}D
-                    </button>
+                    <button key={d} onClick={() => { setPeriodoRapido(d); setDataInicio(''); setDataFim(''); }} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase transition-all ${periodoRapido === d && !dataInicio && !dataFim ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-400 hover:text-purple-200'}`} > {d}D </button>
                 ))}
                 </div>
-
                 <div className="flex items-center gap-4 bg-purple-900/20 px-6 py-2 rounded-full border border-purple-700/30">
                 <input type="date" value={dataInicio} onChange={(e) => { setDataInicio(e.target.value); setPeriodoRapido(''); }} className="bg-transparent text-white text-[10px] font-bold outline-none uppercase cursor-pointer" />
                 <div className="h-4 w-[1px] bg-purple-700/30"></div>
                 <input type="date" value={dataFim} onChange={(e) => { setDataFim(e.target.value); setPeriodoRapido(''); }} className="bg-transparent text-white text-[10px] font-bold outline-none uppercase cursor-pointer" />
                 </div>
             </div>
-            
-            {loading && <span className="text-purple-400 text-[10px] animate-pulse">ATUALIZANDO DADOS...</span>}
+            {loading && <span className="text-purple-400 text-[10px] animate-pulse font-black">SINCRONIZANDO SUPABASE...</span>}
           </div>
         </header>
 
@@ -230,11 +239,11 @@ export default function Dashboard() {
           <div className="lg:col-span-3 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-purple-900/10 backdrop-blur-xl p-6 rounded-[2rem] border border-purple-500/20 text-center">
-                <p className="text-purple-400 text-[9px] font-black uppercase mb-2 tracking-widest">Investimento ({plataforma === 'meta_ads' ? 'Meta' : 'Google'})</p>
+                <p className="text-purple-400 text-[9px] font-black uppercase mb-2 tracking-widest">Investimento {plataforma === 'meta_ads' ? 'Meta' : 'Google'}</p>
                 <p className="text-3xl font-bold italic text-white">R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
               <div className="bg-purple-900/10 backdrop-blur-xl p-6 rounded-[2rem] border border-purple-500/20 text-center">
-                <p className="text-purple-400 text-[9px] font-black uppercase mb-2 tracking-widest">{plataforma === 'meta_ads' ? 'Leads' : 'Conversões'} Gerados</p>
+                <p className="text-purple-400 text-[9px] font-black uppercase mb-2 tracking-widest">{plataforma === 'meta_ads' ? 'Leads' : 'Conversões'}</p>
                 <p className="text-4xl font-bold italic text-white">{totalLeads}</p>
               </div>
               <div className={`p-6 rounded-[2rem] border backdrop-blur-xl text-center ${totalSOS > 0 ? 'bg-red-900/20 border-red-500/40' : 'bg-purple-900/10 border-purple-500/20'}`}>
@@ -245,10 +254,10 @@ export default function Dashboard() {
 
             <div className="bg-purple-900/5 backdrop-blur-md p-8 rounded-[3rem] border border-purple-500/10 h-[500px]">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-400 mb-6 flex items-center gap-2">
-                {gestorAtivo === 'Todos' ? `🔴 Crítico ${plataforma.replace('_', ' ')}: Estouraram CPL` : `📊 Performance ${plataforma.replace('_', ' ')}: ${gestorAtivo}`}
+                {gestorAtivo === 'Todos' ? `🔴 Crítico ${plataforma}` : `📊 Performance ${plataforma}: ${gestorAtivo}`}
               </h3>
               <ResponsiveContainer width="100%" height="90%">
-                <ComposedChart data={clientesGrafico} margin={{ bottom: 100, top: 20, left: 10, right: 10 }}>
+                <ComposedChart data={todosClientes.filter(c => gestorAtivo === 'Todos' ? c.estourouMeta : true)} margin={{ bottom: 100, top: 20, left: 10, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1433" />
                   <XAxis dataKey="nome" stroke="#ffffff" fontSize={10} interval={0} angle={-45} textAnchor="end" tickMargin={25} />
                   <YAxis yAxisId="left" hide />
@@ -258,7 +267,7 @@ export default function Dashboard() {
                     <LabelList dataKey="leads" position="top" fill="#8b5cf6" fontSize={10} fontWeight="bold" />
                   </Bar>
                   <Bar yAxisId="left" dataKey="cpl" radius={[6, 6, 0, 0]} barSize={25}>
-                    {clientesGrafico.map((entry, index) => (
+                    {todosClientes.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.estourouMeta ? '#ef4444' : '#4b2a85'} />
                     ))}
                     <LabelList dataKey="cpl" position="top" fill="#fff" fontSize={9} formatter={(v: any) => `R$${Number(v).toFixed(2)}`} />
@@ -271,14 +280,14 @@ export default function Dashboard() {
 
           <div className="bg-purple-900/20 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-purple-500/30 h-[750px] flex flex-col">
             <h2 className="text-[10px] font-black mb-6 uppercase tracking-widest text-purple-300 border-b border-purple-500/20 pb-4 text-center">
-              Clientes {plataforma === 'meta_ads' ? 'Meta' : 'Google'} ({todosClientes.length})
+              Clientes {plataforma} ({todosClientes.length})
             </h2>
             <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar">
               {todosClientes.map((c, index) => (
                 <div key={c.nome} className={`p-4 rounded-2xl border ${c.estourouMeta ? 'bg-red-950/40 border-red-500/60' : 'bg-purple-950/40 border-purple-800/30'}`}>
                   <p className="text-[10px] font-black uppercase text-white truncate">{index + 1}. {c.nome}</p>
                   <div className="flex justify-between mt-2">
-                    <span className="text-[9px] text-purple-400 font-bold">{c.leads} Leads</span>
+                    <span className="text-[9px] text-purple-400 font-bold">{c.leads} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}</span>
                     <span className={`text-xs font-black ${c.estourouMeta ? 'text-red-500' : 'text-white'}`}>R$ {c.cpl.toFixed(2)}</span>
                   </div>
                 </div>
