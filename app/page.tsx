@@ -290,7 +290,7 @@ export default function Dashboard() {
       const meta = parse(regs[0][cols.meta]);
       const cpl = parseFloat((leads > 0 ? gasto / leads : 0).toFixed(2));
       return { nome, gasto, leads, cpl, meta, estourouMeta: meta > 0 && cpl > meta };
-    }).sort((a, b) => a.estourouMeta === b.estourouMeta ? b.gasto - a.gasto : a.estourouMeta ? -1 : 1);
+    }).sort((a, b) => a.estourouMeta === b.estourouMeta ? b.cpl - a.cpl : a.estourouMeta ? -1 : 1);
   }, [dadosFiltrados, cols]);
 
   // ── GRÁFICO POR DIA quando cliente selecionado ────────────────────────────
