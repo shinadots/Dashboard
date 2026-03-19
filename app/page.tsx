@@ -9,6 +9,7 @@ import Image from 'next/image';
 
 interface AdsData { [key: string]: any; }
 
+// ─── ESTILOS BASE (mantidos do original) ──────────────────────────────────────
 const S = {
   page: { minHeight: '100vh', padding: '24px', backgroundColor: '#0a051a', color: '#faf5ff', fontFamily: 'sans-serif', boxSizing: 'border-box' as const },
   inner: { maxWidth: '1800px', margin: '0 auto', position: 'relative' as const },
@@ -36,17 +37,6 @@ const S = {
   cardValueRed: { fontSize: '28px', fontWeight: 700, fontStyle: 'italic', color: '#ef4444', margin: 0 },
   chartBox: { backgroundColor: 'rgba(88,28,135,0.05)', padding: '32px', borderRadius: '3rem', border: '1px solid rgba(168,85,247,0.1)', height: '500px' },
   chartTitle: { fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' as const, letterSpacing: '0.1em', color: '#a855f7', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' },
-  sidebar: { backgroundColor: 'rgba(88,28,135,0.2)', padding: '24px', borderRadius: '2.5rem', border: '1px solid rgba(168,85,247,0.3)', height: '750px', display: 'flex', flexDirection: 'column' as const },
-  sidebarTitle: { fontSize: '10px', fontWeight: 900, marginBottom: '24px', textTransform: 'uppercase' as const, letterSpacing: '0.1em', color: '#d8b4fe', borderBottom: '1px solid rgba(168,85,247,0.2)', paddingBottom: '16px', textAlign: 'center' as const },
-  sidebarList: { overflowY: 'auto' as const, flex: 1, paddingRight: '8px', display: 'flex', flexDirection: 'column' as const, gap: '12px' },
-  clientCard: (sos: boolean): React.CSSProperties => ({ padding: '16px', borderRadius: '1rem', border: sos ? '1px solid rgba(239,68,68,0.6)' : '1px solid rgba(88,28,135,0.3)', backgroundColor: sos ? 'rgba(69,10,10,0.4)' : 'rgba(59,7,100,0.4)' }),
-  clientName: { fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' as const, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, margin: 0 },
-  clientRow: { display: 'flex', justifyContent: 'space-between', marginTop: '8px' },
-  clientRow2: { display: 'flex', justifyContent: 'space-between', marginTop: '4px' },
-  clientLeads: { fontSize: '9px', color: '#a855f7', fontWeight: 700 },
-  clientCPL: (sos: boolean): React.CSSProperties => ({ fontSize: '9px', fontWeight: 900, color: sos ? '#ef4444' : '#fff' }),
-  clientGasto: { fontSize: '9px', color: '#4ade80', fontWeight: 700 },
-  clientMeta: { fontSize: '9px', color: '#d8b4fe', fontWeight: 700 },
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -54,15 +44,174 @@ const CustomTooltip = ({ active, payload }: any) => {
     const data = payload[0].payload;
     return (
       <div style={{ backgroundColor: '#0a051a', border: '1px solid #4b2a85', borderRadius: '20px', padding: '12px 16px' }}>
-        <p style={{ color: '#fff', fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>{data.nome}</p>
-        <p style={{ color: '#fff', fontSize: '11px', marginBottom: '4px' }}>Resultado: <span style={{ fontWeight: 'bold' }}>{data.leads}</span></p>
-        <p style={{ color: '#fff', fontSize: '11px', marginBottom: '4px' }}>CPL: <span style={{ fontWeight: 'bold' }}>R$ {data.cpl.toFixed(2)}</span></p>
-        <p style={{ color: '#fff', fontSize: '11px' }}>Investimento: <span style={{ fontWeight: 'bold' }}>R$ {data.gasto.toFixed(2)}</span></p>
+        <p style={{ color: '#fff', fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>{data.nome || data.data}</p>
+        <p style={{ color: '#fff', fontSize: '11px', marginBottom: '4px' }}>Resultado: <b>{data.leads}</b></p>
+        <p style={{ color: '#fff', fontSize: '11px', marginBottom: '4px' }}>CPL: <b>R$ {data.cpl.toFixed(2)}</b></p>
+        <p style={{ color: '#fff', fontSize: '11px' }}>Investimento: <b>R$ {data.gasto.toFixed(2)}</b></p>
       </div>
     );
   }
   return null;
 };
+
+// ─── SIDEBAR ESTILIZADA ────────────────────────────────────────────────────────
+function ClienteSidebar({
+  clientes,
+  plataforma,
+  clienteSelecionado,
+  onSelect,
+}: {
+  clientes: { nome: string; gasto: number; leads: number; cpl: number; meta: number; estourouMeta: boolean }[];
+  plataforma: 'meta_ads' | 'google_ads';
+  clienteSelecionado: string | null;
+  onSelect: (nome: string) => void;
+}) {
+  const label = plataforma === 'google_ads' ? 'Google Ads' : 'Meta Ads';
+  const sosCount = clientes.filter(c => c.estourouMeta).length;
+
+  return (
+    <aside style={{
+      background: '#13102a',
+      border: '1px solid rgba(120,80,255,0.18)',
+      borderRadius: '18px',
+      display: 'flex',
+      flexDirection: 'column',
+      boxShadow: '0 0 60px rgba(124,58,237,0.10), 0 2px 24px rgba(0,0,0,0.5)',
+      position: 'relative',
+      overflow: 'hidden',
+      height: '750px',
+    }}>
+
+      {/* top glow line */}
+      <div style={{
+        position: 'absolute', top: 0, left: '20%', right: '20%', height: '2px',
+        background: 'linear-gradient(90deg, transparent, #a855f7, transparent)',
+        borderRadius: '99px', zIndex: 1,
+      }} />
+
+      {/* Header */}
+      <div style={{
+        padding: '16px 18px 14px',
+        borderBottom: '1px solid rgba(120,80,255,0.18)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: '8px', flexShrink: 0,
+      }}>
+        <span style={{
+          fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em',
+          textTransform: 'uppercase', color: '#c084fc', whiteSpace: 'nowrap',
+        }}>
+          Clientes {label}
+        </span>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {sosCount > 0 && (
+            <span style={{
+              background: 'rgba(255,77,109,0.18)',
+              border: '1px solid rgba(255,77,109,0.4)',
+              borderRadius: '6px', padding: '2px 7px',
+              fontSize: '9px', fontWeight: 800, color: '#ff4d6d',
+              letterSpacing: '0.08em',
+              display: 'flex', alignItems: 'center', gap: '4px',
+            }}>
+              <span style={{ animation: 'sosPulse 1.2s ease-in-out infinite' }}>●</span>
+              {sosCount} S.O.S
+            </span>
+          )}
+          <span style={{
+            background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+            color: '#fff', fontSize: '10px', fontWeight: 700,
+            padding: '3px 9px', borderRadius: '99px',
+          }}>
+            {clientes.length}
+          </span>
+        </div>
+      </div>
+
+      {/* Lista completa */}
+      <div style={{
+        overflowY: 'auto', flex: 1,
+        padding: '10px 14px',
+        display: 'flex', flexDirection: 'column', gap: '8px',
+        scrollbarWidth: 'thin', scrollbarColor: '#7c3aed transparent',
+      }}>
+        {clientes.map((c, i) => {
+          const ativo = clienteSelecionado === c.nome;
+          const cplExibido = c.leads === 0 ? c.gasto : c.cpl;
+
+          return (
+            <div
+              key={c.nome}
+              onClick={() => onSelect(c.nome)}
+              style={{
+                background: ativo
+                  ? 'rgba(124,58,237,0.35)'
+                  : c.estourouMeta ? 'rgba(255,77,109,0.07)' : '#1a1535',
+                border: `1px solid ${
+                  ativo ? 'rgba(168,85,247,0.6)'
+                  : c.estourouMeta ? 'rgba(255,77,109,0.28)' : 'rgba(120,80,255,0.16)'
+                }`,
+                borderRadius: '12px', padding: '11px 13px',
+                cursor: 'pointer', transition: 'border-color .15s, background .15s',
+              }}
+            >
+              {/* Nome */}
+              <div style={{
+                fontSize: '10.5px', fontWeight: 700,
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                color: '#fff', marginBottom: '7px',
+                display: 'flex', alignItems: 'center', gap: '5px',
+              }}>
+                <span style={{ color: 'rgba(255,255,255,0.38)', fontWeight: 600, flexShrink: 0 }}>
+                  {i + 1}.
+                </span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.nome}
+                </span>
+                {c.estourouMeta && (
+                  <span style={{
+                    background: 'rgba(255,77,109,0.2)', border: '1px solid rgba(255,77,109,0.4)',
+                    borderRadius: '5px', padding: '1px 6px',
+                    fontSize: '8.5px', fontWeight: 800, color: '#ff4d6d', flexShrink: 0,
+                  }}>
+                    S.O.S
+                  </span>
+                )}
+              </div>
+
+              {/* Métricas */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    {c.leads} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}
+                  </span>
+                  <span style={{ fontWeight: 600, color: c.estourouMeta ? '#ff4d6d' : '#00e5a0' }}>
+                    CPL R$ {cplExibido.toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    Gasto <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
+                      R$ {c.gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </span>
+                  {c.meta > 0 && (
+                    <span style={{ color: '#c084fc', fontSize: '10px' }}>
+                      Meta R$ {c.meta.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @keyframes sosPulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+      `}</style>
+    </aside>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [data, setData] = useState<AdsData[]>([]);
@@ -71,6 +220,7 @@ export default function Dashboard() {
   const [periodoRapido, setPeriodoRapido] = useState('7');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+  const [clienteSelecionado, setClienteSelecionado] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -83,6 +233,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setIsMounted(true);
+    setClienteSelecionado(null); // reset ao trocar plataforma
     async function fetchData() {
       setLoading(true);
       let allData: AdsData[] = [];
@@ -142,10 +293,43 @@ export default function Dashboard() {
     }).sort((a, b) => a.estourouMeta === b.estourouMeta ? b.gasto - a.gasto : a.estourouMeta ? -1 : 1);
   }, [dadosFiltrados, cols]);
 
+  // ── GRÁFICO POR DIA quando cliente selecionado ────────────────────────────
+  const dadosPorDia = useMemo(() => {
+    if (!clienteSelecionado) return [];
+    const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
+
+    const registros = dadosFiltrados.filter(d => d[cols.cliente]?.trim() === clienteSelecionado);
+    const agrupado: Record<string, { data: string; gasto: number; leads: number }> = {};
+
+    registros.forEach(r => {
+      const dia = r[cols.data]?.substring(0, 10);
+      if (!dia) return;
+      if (!agrupado[dia]) agrupado[dia] = { data: dia, gasto: 0, leads: 0 };
+      agrupado[dia].gasto += parse(r[cols.gasto]);
+      agrupado[dia].leads += parse(r[cols.leads]);
+    });
+
+    return Object.values(agrupado)
+      .map(d => ({ ...d, cpl: d.leads > 0 ? parseFloat((d.gasto / d.leads).toFixed(2)) : 0 }))
+      .sort((a, b) => a.data.localeCompare(b.data));
+  }, [clienteSelecionado, dadosFiltrados, cols]);
+
   const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
-  const totalGasto = dadosFiltrados.reduce((a, c) => a + parse(c[cols.gasto]), 0);
-  const totalLeads = dadosFiltrados.reduce((a, c) => a + parse(c[cols.leads]), 0);
+
+  // Cards usam dados do cliente selecionado quando houver, senão totais filtrados
+  const dadosCards = clienteSelecionado ? dadosPorDia : dadosFiltrados;
+  const totalGasto = clienteSelecionado
+    ? dadosPorDia.reduce((a, c) => a + c.gasto, 0)
+    : dadosFiltrados.reduce((a, c) => a + parse(c[cols.gasto]), 0);
+  const totalLeads = clienteSelecionado
+    ? dadosPorDia.reduce((a, c) => a + c.leads, 0)
+    : dadosFiltrados.reduce((a, c) => a + parse(c[cols.leads]), 0);
   const totalSOS = todosClientes.filter(c => c.estourouMeta).length;
+
+  // Dados do gráfico: por dia se cliente selecionado, senão todos clientes (filtro S.O.S se visão geral)
+  const dadosGrafico = clienteSelecionado
+    ? dadosPorDia
+    : todosClientes.filter(c => gestorAtivo === 'Todos' ? c.estourouMeta : true);
 
   if (!isMounted) return null;
 
@@ -155,18 +339,26 @@ export default function Dashboard() {
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b2a85; border-radius: 10px; }
         * { box-sizing: border-box; }
-        @media (max-width: 1024px) {
-          .main-grid { grid-template-columns: 1fr !important; }
-        }
-        @media (max-width: 768px) {
-          .cards-row { grid-template-columns: 1fr !important; }
-        }
+        @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr !important; } }
+        @media (max-width: 768px) { .cards-row { grid-template-columns: 1fr !important; } }
       `}</style>
 
-      <div style={S.inner}>
+      {/* Background logo watermark */}
+      <div aria-hidden="true" style={{
+        position: 'fixed', inset: 0,
+        backgroundImage: "url('/logo-empresa.png')",
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center center',
+        backgroundSize: '35%',
+        opacity: 0.04,
+        pointerEvents: 'none',
+        zIndex: 0,
+      }} />
+
+      <div style={{ ...S.inner, zIndex: 1 }}>
         <header style={S.header}>
           <div style={S.headerTop}>
-            <Image src="/logo-empresa.png" alt="Logo" width={200} height={50} style={{ height: '48px', width: 'auto' }} />
+            <Image src="/logo-empresa.png" alt="Logo" width={220} height={64} style={{ height: '64px', width: 'auto' }} priority />
             <div style={S.platformSwitch}>
               <button onClick={() => setPlataforma('meta_ads')} style={S.btnMeta(plataforma === 'meta_ads')}>Meta Ads</button>
               <button onClick={() => setPlataforma('google_ads')} style={S.btnGoogle(plataforma === 'google_ads')}>Google Ads</button>
@@ -191,12 +383,30 @@ export default function Dashboard() {
                 <input type="date" value={dataFim} style={S.dateInput} onChange={e => { setDataFim(e.target.value); setPeriodoRapido(''); }} />
               </div>
             </div>
-            {loading && <span style={S.loading}>SINCRONIZANDO SUPABASE...</span>}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {loading && <span style={S.loading}>SINCRONIZANDO SUPABASE...</span>}
+              {/* Botão de limpar seleção */}
+              {clienteSelecionado && (
+                <button
+                  onClick={() => setClienteSelecionado(null)}
+                  style={{
+                    background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(168,85,247,0.4)',
+                    borderRadius: '8px', color: '#c084fc',
+                    fontSize: '10px', fontWeight: 700, padding: '5px 14px',
+                    cursor: 'pointer', letterSpacing: '0.06em',
+                  }}
+                >
+                  ✕ {clienteSelecionado}
+                </button>
+              )}
+            </div>
           </div>
         </header>
 
         <div className="main-grid" style={S.grid}>
           <div style={S.gridLeft}>
+            {/* CARDS */}
             <div className="cards-row" style={S.cardsRow}>
               <div style={S.card}>
                 <p style={S.cardLabel}>Investimento {plataforma === 'meta_ads' ? 'Meta' : 'Google'}</p>
@@ -212,14 +422,32 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* GRÁFICO */}
             <div style={S.chartBox}>
               <h3 style={S.chartTitle}>
-                {gestorAtivo === 'Todos' ? `🔴 Crítico ${plataforma}` : `📊 Performance ${plataforma}: ${gestorAtivo}`}
+                {clienteSelecionado
+                  ? `📅 ${clienteSelecionado} — performance por dia`
+                  : gestorAtivo === 'Todos'
+                    ? `🔴 Crítico ${plataforma}`
+                    : `📊 Performance ${plataforma}: ${gestorAtivo}`
+                }
               </h3>
               <ResponsiveContainer width="100%" height="90%">
-                <ComposedChart data={todosClientes.filter(c => gestorAtivo === 'Todos' ? c.estourouMeta : true)} margin={{ bottom: 100, top: 20, left: 10, right: 10 }}>
+                <ComposedChart
+                  data={dadosGrafico}
+                  margin={{ bottom: 100, top: 20, left: 10, right: 10 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1433" />
-                  <XAxis dataKey="nome" stroke="#ffffff" fontSize={10} interval={0} angle={-45} textAnchor="end" tickMargin={25} />
+                  <XAxis
+                    dataKey={clienteSelecionado ? 'data' : 'nome'}
+                    stroke="#ffffff" fontSize={10} interval={0} angle={-45}
+                    textAnchor="end" tickMargin={25}
+                    tickFormatter={(v) => {
+                      if (!clienteSelecionado) return v;
+                      const d = new Date(v);
+                      return `${d.getDate()}/${d.getMonth() + 1}`;
+                    }}
+                  />
                   <YAxis yAxisId="left" hide />
                   <YAxis yAxisId="right" orientation="right" hide />
                   <Tooltip content={<CustomTooltip />} />
@@ -227,8 +455,8 @@ export default function Dashboard() {
                     <LabelList dataKey="leads" position="top" fill="#8b5cf6" fontSize={10} fontWeight="bold" />
                   </Bar>
                   <Bar yAxisId="left" dataKey="cpl" radius={[6, 6, 0, 0]} barSize={25}>
-                    {todosClientes.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.estourouMeta ? '#ef4444' : '#4b2a85'} />
+                    {dadosGrafico.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={(entry as any).estourouMeta ? '#ef4444' : '#4b2a85'} />
                     ))}
                     <LabelList dataKey="cpl" position="top" fill="#fff" fontSize={9} formatter={(v: any) => `R$${Number(v).toFixed(2)}`} />
                   </Bar>
@@ -238,27 +466,13 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={S.sidebar}>
-            <h2 style={S.sidebarTitle}>Clientes {plataforma} ({todosClientes.length})</h2>
-            <div className="custom-scrollbar" style={S.sidebarList}>
-              {todosClientes.map((c, index) => {
-                const cplExibido = c.leads === 0 ? c.gasto : c.cpl;
-                return (
-                  <div key={c.nome} style={S.clientCard(c.estourouMeta)}>
-                    <p style={S.clientName}>{index + 1}. {c.nome}</p>
-                    <div style={S.clientRow}>
-                      <span style={S.clientLeads}>{c.leads} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}</span>
-                      <span style={S.clientCPL(c.estourouMeta)}>CPL R$ {cplExibido.toFixed(2)}</span>
-                    </div>
-                    <div style={S.clientRow2}>
-                      <span style={S.clientGasto}>Gasto R$ {c.gasto.toFixed(2)}</span>
-                      {c.meta > 0 && <span style={S.clientMeta}>Meta R$ {c.meta.toFixed(2)}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* SIDEBAR ESTILIZADA */}
+          <ClienteSidebar
+            clientes={todosClientes}
+            plataforma={plataforma}
+            clienteSelecionado={clienteSelecionado}
+            onSelect={(nome) => setClienteSelecionado(prev => prev === nome ? null : nome)}
+          />
         </div>
       </div>
     </main>
