@@ -185,7 +185,7 @@ export default function Dashboard() {
   const [data, setData] = useState<AdsData[]>([]);
   const [plataforma, setPlataforma] = useState<'meta_ads' | 'google_ads'>('meta_ads');
   const [gestorAtivo, setGestorAtivo] = useState('Todos');
-  const [SquadAtivo, setSquadAtivo] = useState('Todos'); // ← NOVO
+  const [squadAtivo, setSquadAtivo] = useState('Todos'); // ← NOVO
   const [periodoRapido, setPeriodoRapido] = useState('7');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -233,8 +233,8 @@ export default function Dashboard() {
 
   // ← NOVO: Opções de squads
   const opcoesSquads = useMemo(() => {
-    const Squads = data.map(i => i['Squad']?.trim()).filter(Boolean);
-    return [...new Set(Squads)].sort();
+    const squads = data.map(i => i['squad']?.trim()).filter(Boolean);
+    return [...new Set(squads)].sort();
   }, [data]);
 
   const dadosFiltrados = useMemo(() => {
@@ -255,11 +255,11 @@ export default function Dashboard() {
       }
       return (
         (gestorAtivo === 'Todos' || item[cols.gestor]?.trim() === gestorAtivo) &&
-        (SquadAtivo === 'Todos' || item['Squad']?.trim() === SquadAtivo) && // ← NOVO
+        (squadAtivo === 'Todos' || item['squad']?.trim() === squadAtivo) && // ← NOVO
         ok
       );
     });
-  }, [data, gestorAtivo, SquadAtivo, dataInicio, dataFim, periodoRapido, cols]); // ← squadAtivo adicionado
+  }, [data, gestorAtivo, squadAtivo, dataInicio, dataFim, periodoRapido, cols]); // ← squadAtivo adicionado
 
   const todosClientes = useMemo(() => {
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
@@ -344,7 +344,7 @@ export default function Dashboard() {
                 {opcoesGestores.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
 
-              <select style={S.select} value={SquadAtivo} onChange={e => setSquadAtivo(e.target.value)}>
+              <select style={S.select} value={squadAtivo} onChange={e => setSquadAtivo(e.target.value)}>
                 <option value="Todos">Todos os Squads</option>
                 {opcoesSquads.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
