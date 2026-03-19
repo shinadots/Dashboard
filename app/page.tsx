@@ -233,7 +233,7 @@ export default function Dashboard() {
 
   // ← NOVO: Opções de squads
   const opcoesSquads = useMemo(() => {
-    const squads = data.map(i => i['squad']?.trim()).filter(Boolean);
+    const squads = data.map(i => i['Squad']?.trim()).filter(Boolean);
     return [...new Set(squads)].sort();
   }, [data]);
 
@@ -255,7 +255,7 @@ export default function Dashboard() {
       }
       return (
         (gestorAtivo === 'Todos' || item[cols.gestor]?.trim() === gestorAtivo) &&
-        (squadAtivo === 'Todos' || item['squad']?.trim() === squadAtivo) && // ← NOVO
+        (squadAtivo === 'Todos' || item['Squad']?.trim() === squadAtivo) && // ← NOVO
         ok
       );
     });
