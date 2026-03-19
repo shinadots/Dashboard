@@ -444,7 +444,7 @@ export default function Dashboard() {
                     textAnchor="end" tickMargin={25}
                     tickFormatter={(v) => {
                       if (!clienteSelecionado) return v;
-                      const d = new Date(v);
+                      const d = new Date(`${v}T00:00:00`);
                       return `${d.getDate()}/${d.getMonth() + 1}`;
                     }}
                   />
