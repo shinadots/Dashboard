@@ -283,15 +283,26 @@ export default function Dashboard() {
               Clientes {plataforma} ({todosClientes.length})
             </h2>
             <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar">
-              {todosClientes.map((c, index) => (
-                <div key={c.nome} className={`p-4 rounded-2xl border ${c.estourouMeta ? 'bg-red-950/40 border-red-500/60' : 'bg-purple-950/40 border-purple-800/30'}`}>
-                  <p className="text-[10px] font-black uppercase text-white truncate">{index + 1}. {c.nome}</p>
-                  <div className="flex justify-between mt-2">
-                    <span className="text-[9px] text-purple-400 font-bold">{c.leads} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}</span>
-                    <span className={`text-xs font-black ${c.estourouMeta ? 'text-red-500' : 'text-white'}`}>R$ {c.cpl.toFixed(2)}</span>
+              {todosClientes.map((c, index) => {
+                const cplExibido = c.leads === 0 ? c.gasto : c.cpl;
+                return (
+                  <div key={c.nome} className={`p-4 rounded-2xl border ${c.estourouMeta ? 'bg-red-950/40 border-red-500/60' : 'bg-purple-950/40 border-purple-800/30'}`}>
+                    <p className="text-[10px] font-black uppercase text-white truncate">{index + 1}. {c.nome}</p>
+                    <div className="flex justify-between mt-2">
+                      <span className="text-[9px] text-purple-400 font-bold">{c.leads} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}</span>
+                      <span className={`text-[9px] font-black ${c.estourouMeta ? 'text-red-500' : 'text-white'}`}>
+                        CPL R$ {cplExibido.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[9px] text-green-400 font-bold">Gasto R$ {c.gasto.toFixed(2)}</span>
+                      {c.meta > 0 && (
+                        <span className="text-[9px] text-purple-300 font-bold">Meta R$ {c.meta.toFixed(2)}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
