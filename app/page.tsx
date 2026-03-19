@@ -255,7 +255,7 @@ export default function Dashboard() {
       }
       return (
         (gestorAtivo === 'Todos' || item[cols.gestor]?.trim() === gestorAtivo) &&
-        (squadAtivo === 'Todos' || item['Squad']?.trim() === squadAtivo) && // ← NOVO
+        (squadAtivo === 'Todos' || item['Squad']?.toString().trim() === squadAtivo) && // ← NOVO
         ok
       );
     });
