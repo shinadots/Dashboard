@@ -9,7 +9,7 @@ import Image from 'next/image';
 
 interface AdsData { [key: string]: any; }
 
-// ─── ESTILOS BASE (mantidos do original) ──────────────────────────────────────
+// ─── ESTILOS BASE ──────────────────────────────────────────────────────────────
 const S = {
   page: { minHeight: '100vh', padding: '24px', backgroundColor: '#0a051a', color: '#faf5ff', fontFamily: 'sans-serif', boxSizing: 'border-box' as const },
   inner: { maxWidth: '1800px', margin: '0 auto', position: 'relative' as const },
@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-// ─── SIDEBAR ESTILIZADA ────────────────────────────────────────────────────────
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 function ClienteSidebar({
   clientes,
   plataforma,
@@ -81,15 +81,11 @@ function ClienteSidebar({
       overflow: 'hidden',
       height: '750px',
     }}>
-
-      {/* top glow line */}
       <div style={{
         position: 'absolute', top: 0, left: '20%', right: '20%', height: '2px',
         background: 'linear-gradient(90deg, transparent, #a855f7, transparent)',
         borderRadius: '99px', zIndex: 1,
       }} />
-
-      {/* Header */}
       <div style={{
         padding: '16px 18px 14px',
         borderBottom: '1px solid rgba(120,80,255,0.18)',
@@ -125,8 +121,6 @@ function ClienteSidebar({
           </span>
         </div>
       </div>
-
-      {/* Lista completa */}
       <div style={{
         overflowY: 'auto', flex: 1,
         padding: '10px 14px',
@@ -136,7 +130,6 @@ function ClienteSidebar({
         {clientes.map((c, i) => {
           const ativo = clienteSelecionado === c.nome;
           const cplExibido = c.leads === 0 ? c.gasto : c.cpl;
-
           return (
             <div
               key={c.nome}
@@ -145,78 +138,54 @@ function ClienteSidebar({
                 background: ativo
                   ? 'rgba(124,58,237,0.35)'
                   : c.estourouMeta ? 'rgba(255,77,109,0.07)' : '#1a1535',
-                border: `1px solid ${
-                  ativo ? 'rgba(168,85,247,0.6)'
-                  : c.estourouMeta ? 'rgba(255,77,109,0.28)' : 'rgba(120,80,255,0.16)'
-                }`,
+                border: `1px solid ${ativo ? 'rgba(168,85,247,0.6)' : c.estourouMeta ? 'rgba(255,77,109,0.28)' : 'rgba(120,80,255,0.16)'}`,
                 borderRadius: '12px', padding: '11px 13px',
                 cursor: 'pointer', transition: 'border-color .15s, background .15s',
               }}
             >
-              {/* Nome */}
               <div style={{
                 fontSize: '10.5px', fontWeight: 700,
                 letterSpacing: '0.06em', textTransform: 'uppercase',
                 color: '#fff', marginBottom: '7px',
                 display: 'flex', alignItems: 'center', gap: '5px',
               }}>
-                <span style={{ color: 'rgba(255,255,255,0.38)', fontWeight: 600, flexShrink: 0 }}>
-                  {i + 1}.
-                </span>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.nome}
-                </span>
+                <span style={{ color: 'rgba(255,255,255,0.38)', fontWeight: 600, flexShrink: 0 }}>{i + 1}.</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
                 {c.estourouMeta && (
                   <span style={{
                     background: 'rgba(255,77,109,0.2)', border: '1px solid rgba(255,77,109,0.4)',
                     borderRadius: '5px', padding: '1px 6px',
                     fontSize: '8.5px', fontWeight: 800, color: '#ff4d6d', flexShrink: 0,
-                  }}>
-                    S.O.S
-                  </span>
+                  }}>S.O.S</span>
                 )}
               </div>
-
-              {/* Métricas */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    {c.leads} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}
-                  </span>
-                  <span style={{ fontWeight: 600, color: c.estourouMeta ? '#ff4d6d' : '#00e5a0' }}>
-                    CPL R$ {cplExibido.toFixed(2)}
-                  </span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>{c.leads} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}</span>
+                  <span style={{ fontWeight: 600, color: c.estourouMeta ? '#ff4d6d' : '#00e5a0' }}>CPL R$ {cplExibido.toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px' }}>
                   <span style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    Gasto <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
-                      R$ {c.gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
+                    Gasto <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>R$ {c.gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </span>
-                  {c.meta > 0 && (
-                    <span style={{ color: '#c084fc', fontSize: '10px' }}>
-                      Meta R$ {c.meta.toFixed(2)}
-                    </span>
-                  )}
+                  {c.meta > 0 && <span style={{ color: '#c084fc', fontSize: '10px' }}>Meta R$ {c.meta.toFixed(2)}</span>}
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-
-      <style>{`
-        @keyframes sosPulse { 0%,100%{opacity:1} 50%{opacity:.25} }
-      `}</style>
+      <style>{`@keyframes sosPulse { 0%,100%{opacity:1} 50%{opacity:.25} }`}</style>
     </aside>
   );
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [data, setData] = useState<AdsData[]>([]);
   const [plataforma, setPlataforma] = useState<'meta_ads' | 'google_ads'>('meta_ads');
   const [gestorAtivo, setGestorAtivo] = useState('Todos');
+  const [squadAtivo, setSquadAtivo] = useState('Todos'); // ← NOVO
   const [periodoRapido, setPeriodoRapido] = useState('7');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -233,7 +202,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     setIsMounted(true);
-    setClienteSelecionado(null); // reset ao trocar plataforma
+    setClienteSelecionado(null);
+    setSquadAtivo('Todos'); // ← NOVO: reset ao trocar plataforma
     async function fetchData() {
       setLoading(true);
       let allData: AdsData[] = [];
@@ -255,10 +225,17 @@ export default function Dashboard() {
     fetchData();
   }, [plataforma, cols]);
 
+  // Opções de gestores
   const opcoesGestores = useMemo(() => {
     const gestores = data.map(i => i[cols.gestor]?.trim()).filter(Boolean);
     return [...new Set(gestores)].sort();
   }, [data, cols]);
+
+  // ← NOVO: Opções de squads
+  const opcoesSquads = useMemo(() => {
+    const squads = data.map(i => i['squad']?.trim()).filter(Boolean);
+    return [...new Set(squads)].sort();
+  }, [data]);
 
   const dadosFiltrados = useMemo(() => {
     const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -272,13 +249,17 @@ export default function Dashboard() {
       } else {
         const dias = parseInt(periodoRapido);
         const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-        const fim = new Date(hoje); // inclui hoje e ontem
+        const fim = new Date(hoje);
         const ini = new Date(hoje); ini.setDate(hoje.getDate() - dias);
         ok = str >= fmt(ini) && str <= fmt(fim);
       }
-      return (gestorAtivo === 'Todos' || item[cols.gestor]?.trim() === gestorAtivo) && ok;
+      return (
+        (gestorAtivo === 'Todos' || item[cols.gestor]?.trim() === gestorAtivo) &&
+        (squadAtivo === 'Todos' || item['squad']?.trim() === squadAtivo) && // ← NOVO
+        ok
+      );
     });
-  }, [data, gestorAtivo, dataInicio, dataFim, periodoRapido, cols]);
+  }, [data, gestorAtivo, squadAtivo, dataInicio, dataFim, periodoRapido, cols]); // ← squadAtivo adicionado
 
   const todosClientes = useMemo(() => {
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
@@ -293,14 +274,11 @@ export default function Dashboard() {
     }).sort((a, b) => a.estourouMeta === b.estourouMeta ? b.cpl - a.cpl : a.estourouMeta ? -1 : 1);
   }, [dadosFiltrados, cols]);
 
-  // ── GRÁFICO POR DIA quando cliente selecionado ────────────────────────────
   const dadosPorDia = useMemo(() => {
     if (!clienteSelecionado) return [];
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
-
     const registros = dadosFiltrados.filter(d => d[cols.cliente]?.trim() === clienteSelecionado);
     const agrupado: Record<string, { data: string; gasto: number; leads: number }> = {};
-
     registros.forEach(r => {
       const dia = r[cols.data]?.substring(0, 10);
       if (!dia) return;
@@ -308,7 +286,6 @@ export default function Dashboard() {
       agrupado[dia].gasto += parse(r[cols.gasto]);
       agrupado[dia].leads += parse(r[cols.leads]);
     });
-
     return Object.values(agrupado)
       .map(d => ({ ...d, cpl: d.leads > 0 ? parseFloat((d.gasto / d.leads).toFixed(2)) : 0 }))
       .sort((a, b) => a.data.localeCompare(b.data));
@@ -316,8 +293,6 @@ export default function Dashboard() {
 
   const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
 
-  // Cards usam dados do cliente selecionado quando houver, senão totais filtrados
-  const dadosCards = clienteSelecionado ? dadosPorDia : dadosFiltrados;
   const totalGasto = clienteSelecionado
     ? dadosPorDia.reduce((a, c) => a + c.gasto, 0)
     : dadosFiltrados.reduce((a, c) => a + parse(c[cols.gasto]), 0);
@@ -326,7 +301,6 @@ export default function Dashboard() {
     : dadosFiltrados.reduce((a, c) => a + parse(c[cols.leads]), 0);
   const totalSOS = todosClientes.filter(c => c.estourouMeta).length;
 
-  // Dados do gráfico: por dia se cliente selecionado, senão todos clientes (filtro S.O.S se visão geral)
   const dadosGrafico = clienteSelecionado
     ? dadosPorDia
     : todosClientes.filter(c => gestorAtivo === 'Todos' ? c.estourouMeta : true);
@@ -343,7 +317,6 @@ export default function Dashboard() {
         @media (max-width: 768px) { .cards-row { grid-template-columns: 1fr !important; } }
       `}</style>
 
-      {/* Background logo watermark */}
       <div aria-hidden="true" style={{
         position: 'fixed', inset: 0,
         backgroundImage: "url('/logo-empresa.png')",
@@ -363,10 +336,20 @@ export default function Dashboard() {
               <button onClick={() => setPlataforma('meta_ads')} style={S.btnMeta(plataforma === 'meta_ads')}>Meta Ads</button>
               <button onClick={() => setPlataforma('google_ads')} style={S.btnGoogle(plataforma === 'google_ads')}>Google Ads</button>
             </div>
-            <select style={S.select} value={gestorAtivo} onChange={e => setGestorAtivo(e.target.value)}>
-              <option value="Todos">Visão Geral (Apenas S.O.S)</option>
-              {opcoesGestores.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+
+            {/* ─── FILTROS GESTOR + SQUAD ─────────────────────────────────── */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <select style={S.select} value={gestorAtivo} onChange={e => setGestorAtivo(e.target.value)}>
+                <option value="Todos">Visão Geral (Apenas S.O.S)</option>
+                {opcoesGestores.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+
+              <select style={S.select} value={squadAtivo} onChange={e => setSquadAtivo(e.target.value)}>
+                <option value="Todos">Todos os Squads</option>
+                {opcoesSquads.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            {/* ─────────────────────────────────────────────────────────────── */}
           </div>
 
           <div style={S.headerBottom}>
@@ -386,7 +369,6 @@ export default function Dashboard() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {loading && <span style={S.loading}>SINCRONIZANDO SUPABASE...</span>}
-              {/* Botão de limpar seleção */}
               {clienteSelecionado && (
                 <button
                   onClick={() => setClienteSelecionado(null)}
@@ -406,7 +388,6 @@ export default function Dashboard() {
 
         <div className="main-grid" style={S.grid}>
           <div style={S.gridLeft}>
-            {/* CARDS */}
             <div className="cards-row" style={S.cardsRow}>
               <div style={S.card}>
                 <p style={S.cardLabel}>Investimento {plataforma === 'meta_ads' ? 'Meta' : 'Google'}</p>
@@ -422,7 +403,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* GRÁFICO */}
             <div style={S.chartBox}>
               <h3 style={S.chartTitle}>
                 {clienteSelecionado
@@ -433,10 +413,7 @@ export default function Dashboard() {
                 }
               </h3>
               <ResponsiveContainer width="100%" height="90%">
-                <ComposedChart
-                  data={dadosGrafico}
-                  margin={{ bottom: 100, top: 20, left: 10, right: 10 }}
-                >
+                <ComposedChart data={dadosGrafico} margin={{ bottom: 100, top: 20, left: 10, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1433" />
                   <XAxis
                     dataKey={clienteSelecionado ? 'data' : 'nome'}
@@ -466,7 +443,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* SIDEBAR ESTILIZADA */}
           <ClienteSidebar
             clientes={todosClientes}
             plataforma={plataforma}
