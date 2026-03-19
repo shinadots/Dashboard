@@ -233,7 +233,7 @@ export default function Dashboard() {
 
   // ← NOVO: Opções de squads
   const opcoesSquads = useMemo(() => {
-    const squads = data.map(i => i['Squad']?.trim()).filter(Boolean);
+    const squads = data.map(i => i['Squad']?.toString().trim()).filter(Boolean);
     return [...new Set(squads)].sort();
   }, [data]);
 
