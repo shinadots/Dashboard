@@ -291,7 +291,7 @@ export default function Dashboard() {
   // clientes_config, cruzando por account_id.
   const dadosEnriquecidos = useMemo(() => {
     const { metaField } = PLATFORM_CONFIG[plataforma];
-    return data.map(row => {
+    return data.map((row): AdsData => {
       const config = configByAccountId.get(String(row.account_id));
       return {
         ...row,
