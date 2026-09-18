@@ -376,44 +376,29 @@ export default function Dashboard() {
     : todosClientes.filter(c => gestorAtivo === 'Todos' ? c.estourouMeta : true);
 
   // ─── FUNIL DE CRM (Kommo / RD Station) ────────────────────────────────────
-  // crm_funnel_snapshot guarda uma "foto" do funil por dia (quantos leads estão
-  // em cada status, não quantos entraram naquele dia) — por isso busca só a
-  // data mais recente disponível, em vez de somar um período.
+  // Usa o MESMO range de data (rangeInicio/rangeFimExclusivo) já calculado
+  // pra ads — filtra crm_leads por created_at OU updated_at dentro do período,
+  // e agrupa por pipeline/status aqui no front (igual todosClientes faz pra ads).
   const [funilCrm, setFunilCrm] = useState<'kommo' | 'rdstation'>('kommo');
   const [funilData, setFunilData] = useState<AdsData[]>([]);
-  const [funilDataRef, setFunilDataRef] = useState<string | null>(null);
   const [funilLoading, setFunilLoading] = useState(false);
 
   useEffect(() => {
     async function fetchFunil() {
       setFunilLoading(true);
-      const { data: ultima } = await supabase
-        .from('crm_funnel_snapshot')
-        .select('date')
-        .eq('crm', funilCrm)
-        .order('date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!ultima) {
-        setFunilData([]);
-        setFunilDataRef(null);
-        setFunilLoading(false);
-        return;
+      let query = supabase.from('crm_leads').select('*').eq('crm', funilCrm);
+      if (rangeInicio && rangeFimExclusivo) {
+        query = query.or(
+          `and(created_at.gte.${rangeInicio},created_at.lt.${rangeFimExclusivo}),` +
+          `and(updated_at.gte.${rangeInicio},updated_at.lt.${rangeFimExclusivo})`
+        );
       }
-
-      const { data: rows } = await supabase
-        .from('crm_funnel_snapshot')
-        .select('*')
-        .eq('crm', funilCrm)
-        .eq('date', ultima.date);
-
-      setFunilData(rows ?? []);
-      setFunilDataRef(ultima.date);
+      const { data: rows, error } = await query;
+      setFunilData(error ? [] : (rows ?? []));
       setFunilLoading(false);
     }
     fetchFunil();
-  }, [funilCrm]);
+  }, [funilCrm, rangeInicio, rangeFimExclusivo]);
 
   const funilPorPipeline = useMemo(() => {
     const grupos: Record<string, {
@@ -425,10 +410,16 @@ export default function Dashboard() {
     funilData.forEach(row => {
       const pipeline = row.pipeline_name || 'Sem pipeline';
       if (!grupos[pipeline]) grupos[pipeline] = { pipeline, statuses: [], totalLeads: 0, totalValor: 0 };
-      const leads = parseInt(row.lead_count) || 0;
-      const valor = parseFloat(row.deal_value) || 0;
-      grupos[pipeline].statuses.push({ nome: row.status_name || row.status_id, leads, valor });
-      grupos[pipeline].totalLeads += leads;
+      const statusNome = row.status_name || row.status_id;
+      let statusEntry = grupos[pipeline].statuses.find(s => s.nome === statusNome);
+      if (!statusEntry) {
+        statusEntry = { nome: statusNome, leads: 0, valor: 0 };
+        grupos[pipeline].statuses.push(statusEntry);
+      }
+      const valor = parseFloat(row.price) || 0;
+      statusEntry.leads += 1;
+      statusEntry.valor += valor;
+      grupos[pipeline].totalLeads += 1;
       grupos[pipeline].totalValor += valor;
     });
     return Object.values(grupos).sort((a, b) => b.totalLeads - a.totalLeads);
@@ -584,7 +575,7 @@ export default function Dashboard() {
         <div style={S.funilBox}>
           <div style={S.funilHeader}>
             <h3 style={S.chartTitle}>
-              🧭 Funil de CRM {funilDataRef ? `— ${new Date(`${funilDataRef}T00:00:00`).toLocaleDateString('pt-BR')}` : ''}
+              🧭 Funil de CRM
             </h3>
             <div style={S.platformSwitch}>
               <button onClick={() => setFunilCrm('kommo')} style={S.btnMeta(funilCrm === 'kommo')}>Kommo</button>
@@ -594,7 +585,7 @@ export default function Dashboard() {
           </div>
 
           {!funilLoading && funilPorPipeline.length === 0 && (
-            <p style={{ color: '#a855f7', fontSize: '11px' }}>Nenhum snapshot de funil encontrado pra {funilCrm === 'kommo' ? 'Kommo' : 'RD Station'} ainda.</p>
+            <p style={{ color: '#a855f7', fontSize: '11px' }}>Nenhum lead encontrado pra {funilCrm === 'kommo' ? 'Kommo' : 'RD Station'} nesse período.</p>
           )}
 
           <div style={S.funilGrid}>
