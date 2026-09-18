@@ -193,26 +193,88 @@ export default function Dashboard() {
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const cols = useMemo(() => {
-    if (plataforma === 'google_ads') {
-      return { cliente: 'cliente', gestor: 'gestor', gasto: 'gastoTotal', leads: 'leadsTotal', data: 'dataInicio', meta: 'meta' };
+  // Mapeamento de plataforma pros nomes de coluna que o Windsor gerou e pra
+  // tabela clientes_config (Gestor/Squad/meta de CPL, que não vem do Windsor —
+  // é mantida manualmente e cruzada por account_id).
+  const PLATFORM_CONFIG = {
+    meta_ads: {
+      idField: 'conta_fb_id',
+      metaField: 'meta_cpl_fb',
+      leadsCol: 'actions_lead',
+      gastoCol: 'spend',
+      dataCol: 'date',
+    },
+    google_ads: {
+      // TODO: confirmar esses nomes quando o Windsor for configurado pro Google
+      // Ads (mesmo processo já feito pro Meta Ads) — por enquanto é um palpite
+      // baseado no padrão que o Windsor usou pro meta_ads.
+      idField: 'conta_google_id',
+      metaField: 'meta_cpl_google',
+      leadsCol: 'conversions',
+      gastoCol: 'spend',
+      dataCol: 'date',
+    },
+  } as const;
+
+  const [clientesConfig, setClientesConfig] = useState<AdsData[]>([]);
+
+  // clientes_config é pequeno e não depende de plataforma/período — busca uma vez.
+  useEffect(() => {
+    supabase.from('clientes_config').select('*').then(({ data, error }) => {
+      if (!error && data) setClientesConfig(data);
+    });
+  }, []);
+
+  const configByAccountId = useMemo(() => {
+    const map = new Map<string, AdsData>();
+    const idField = PLATFORM_CONFIG[plataforma].idField;
+    for (const c of clientesConfig) {
+      if (c[idField]) map.set(String(c[idField]), c);
     }
-    return { cliente: 'CLIENTE', gestor: 'Gestor', gasto: 'gasto', leads: 'leads', data: 'data_inicio', meta: 'meta cpl' };
-  }, [plataforma]);
+    return map;
+  }, [clientesConfig, plataforma]);
+
+  // Calcula o intervalo de datas ANTES de buscar, pra filtrar direto no Supabase
+  // em vez de trazer a tabela inteira e filtrar no navegador. fimExclusivo é o
+  // dia seguinte ao fim do período, usado com .lt() pra incluir o dia inteiro
+  // mesmo se a coluna tiver componente de hora.
+  const { rangeInicio, rangeFimExclusivo } = useMemo(() => {
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const addDay = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+
+    if (dataInicio || dataFim) {
+      const fimDate = dataFim ? new Date(`${dataFim}T00:00:00`) : null;
+      return {
+        rangeInicio: dataInicio || null,
+        rangeFimExclusivo: fimDate ? fmt(addDay(fimDate, 1)) : null,
+      };
+    }
+    const dias = parseInt(periodoRapido || '7');
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const ini = addDay(hoje, -dias);
+    return { rangeInicio: fmt(ini), rangeFimExclusivo: fmt(addDay(hoje, 1)) };
+  }, [dataInicio, dataFim, periodoRapido]);
 
   useEffect(() => {
     setIsMounted(true);
     setClienteSelecionado(null);
-    setSquadAtivo('Todos'); // ← NOVO: reset ao trocar plataforma
+    setSquadAtivo('Todos');
     async function fetchData() {
       setLoading(true);
       let allData: AdsData[] = [];
       let hasMore = true;
       let page = 0;
       const pageSize = 1000;
+      const { dataCol } = PLATFORM_CONFIG[plataforma];
       while (hasMore) {
         const from = page * pageSize;
-        const { data: adsData, error } = await supabase.from(plataforma).select('*').not(cols.cliente, 'is', null).range(from, from + pageSize - 1);
+        // account_id é o que permite cruzar com clientes_config — linhas sem
+        // ele (sincronizadas antes do campo ser adicionado no Windsor) ficam
+        // de fora, já que não dá pra atribuir a um cliente com segurança.
+        let query = supabase.from(plataforma).select('*').not('account_id', 'is', null);
+        if (rangeInicio) query = query.gte(dataCol, rangeInicio);
+        if (rangeFimExclusivo) query = query.lt(dataCol, rangeFimExclusivo);
+        const { data: adsData, error } = await query.range(from, from + pageSize - 1);
         if (error) { hasMore = false; }
         else if (adsData && adsData.length > 0) {
           allData = [...allData, ...adsData];
@@ -223,82 +285,81 @@ export default function Dashboard() {
       setLoading(false);
     }
     fetchData();
-  }, [plataforma, cols]);
+  }, [plataforma, rangeInicio, rangeFimExclusivo]);
 
-  // Opções de gestores
+  // Junta cada linha de ads com cliente/gestor/squad/meta vindos do
+  // clientes_config, cruzando por account_id.
+  const dadosEnriquecidos = useMemo(() => {
+    const { metaField } = PLATFORM_CONFIG[plataforma];
+    return data.map(row => {
+      const config = configByAccountId.get(String(row.account_id));
+      return {
+        ...row,
+        _cliente: config?.cliente ?? row.account_name,
+        _gestor: config?.gestor ?? null,
+        _squad: config?.squad != null ? String(config.squad) : null,
+        _meta: config ? (parseFloat(config[metaField]) || 0) : 0,
+      };
+    });
+  }, [data, configByAccountId, plataforma]);
+
   const opcoesGestores = useMemo(() => {
-    const gestores = data.map(i => i[cols.gestor]?.trim()).filter(Boolean);
+    const gestores = dadosEnriquecidos.map(i => i._gestor).filter(Boolean);
     return [...new Set(gestores)].sort();
-  }, [data, cols]);
+  }, [dadosEnriquecidos]);
 
-  // ← NOVO: Opções de squads
   const opcoesSquads = useMemo(() => {
-    const squads = data.map(i => i['Squad']?.toString().trim()).filter(Boolean);
+    const squads = dadosEnriquecidos.map(i => i._squad).filter(Boolean);
     return [...new Set(squads)].sort();
-  }, [data]);
+  }, [dadosEnriquecidos]);
 
   const dadosFiltrados = useMemo(() => {
-    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return data.filter(item => {
-      const dateVal = item[cols.data];
-      if (!dateVal) return false;
-      const str = dateVal.substring(0, 10);
-      let ok = false;
-      if (dataInicio || dataFim) {
-        ok = (!dataInicio || str >= dataInicio) && (!dataFim || str <= dataFim);
-      } else {
-        const dias = parseInt(periodoRapido);
-        const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-        const fim = new Date(hoje);
-        const ini = new Date(hoje); ini.setDate(hoje.getDate() - dias);
-        ok = str >= fmt(ini) && str <= fmt(fim);
-      }
-      return (
-        (gestorAtivo === 'Todos' || item[cols.gestor]?.trim() === gestorAtivo) &&
-        (squadAtivo === 'Todos' || item['Squad']?.toString().trim() === squadAtivo) && // ← NOVO
-        ok
-      );
-    });
-  }, [data, gestorAtivo, squadAtivo, dataInicio, dataFim, periodoRapido, cols]); // ← squadAtivo adicionado
+    return dadosEnriquecidos.filter(item => (
+      (gestorAtivo === 'Todos' || item._gestor === gestorAtivo) &&
+      (squadAtivo === 'Todos' || item._squad === squadAtivo)
+    ));
+  }, [dadosEnriquecidos, gestorAtivo, squadAtivo]);
 
   const todosClientes = useMemo(() => {
+    const { leadsCol, gastoCol } = PLATFORM_CONFIG[plataforma];
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
-    const nomes = [...new Set(dadosFiltrados.map(i => i[cols.cliente]?.trim()))].filter(Boolean) as string[];
+    const nomes = [...new Set(dadosFiltrados.map(i => i._cliente?.trim()))].filter(Boolean) as string[];
     return nomes.map(nome => {
-      const regs = dadosFiltrados.filter(d => d[cols.cliente]?.trim() === nome);
-      const gasto = parseFloat(regs.reduce((a, c) => a + parse(c[cols.gasto]), 0).toFixed(2));
-      const leads = regs.reduce((a, c) => a + parse(c[cols.leads]), 0);
-      const meta = parse(regs[0][cols.meta]);
+      const regs = dadosFiltrados.filter(d => d._cliente?.trim() === nome);
+      const gasto = parseFloat(regs.reduce((a, c) => a + parse(c[gastoCol]), 0).toFixed(2));
+      const leads = regs.reduce((a, c) => a + parse(c[leadsCol]), 0);
+      const meta = regs[0]._meta ?? 0;
       const cpl = parseFloat((leads > 0 ? gasto / leads : 0).toFixed(2));
       return { nome, gasto, leads, cpl, meta, estourouMeta: meta > 0 && cpl > meta };
     }).sort((a, b) => a.estourouMeta === b.estourouMeta ? b.cpl - a.cpl : a.estourouMeta ? -1 : 1);
-  }, [dadosFiltrados, cols]);
+  }, [dadosFiltrados, plataforma]);
 
   const dadosPorDia = useMemo(() => {
     if (!clienteSelecionado) return [];
+    const { leadsCol, gastoCol, dataCol } = PLATFORM_CONFIG[plataforma];
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
-    const registros = dadosFiltrados.filter(d => d[cols.cliente]?.trim() === clienteSelecionado);
+    const registros = dadosFiltrados.filter(d => d._cliente?.trim() === clienteSelecionado);
     const agrupado: Record<string, { data: string; gasto: number; leads: number }> = {};
     registros.forEach(r => {
-      const dia = r[cols.data]?.substring(0, 10);
+      const dia = r[dataCol]?.substring(0, 10);
       if (!dia) return;
       if (!agrupado[dia]) agrupado[dia] = { data: dia, gasto: 0, leads: 0 };
-      agrupado[dia].gasto += parse(r[cols.gasto]);
-      agrupado[dia].leads += parse(r[cols.leads]);
+      agrupado[dia].gasto += parse(r[gastoCol]);
+      agrupado[dia].leads += parse(r[leadsCol]);
     });
     return Object.values(agrupado)
       .map(d => ({ ...d, cpl: d.leads > 0 ? parseFloat((d.gasto / d.leads).toFixed(2)) : 0 }))
       .sort((a, b) => a.data.localeCompare(b.data));
-  }, [clienteSelecionado, dadosFiltrados, cols]);
+  }, [clienteSelecionado, dadosFiltrados, plataforma]);
 
   const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
 
   const totalGasto = clienteSelecionado
     ? dadosPorDia.reduce((a, c) => a + c.gasto, 0)
-    : dadosFiltrados.reduce((a, c) => a + parse(c[cols.gasto]), 0);
+    : dadosFiltrados.reduce((a, c) => a + parse(c[PLATFORM_CONFIG[plataforma].gastoCol]), 0);
   const totalLeads = clienteSelecionado
     ? dadosPorDia.reduce((a, c) => a + c.leads, 0)
-    : dadosFiltrados.reduce((a, c) => a + parse(c[cols.leads]), 0);
+    : dadosFiltrados.reduce((a, c) => a + parse(c[PLATFORM_CONFIG[plataforma].leadsCol]), 0);
   const totalSOS = todosClientes.filter(c => c.estourouMeta).length;
 
   const dadosGrafico = clienteSelecionado
