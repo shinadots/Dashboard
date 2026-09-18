@@ -37,6 +37,16 @@ const S = {
   cardValueRed: { fontSize: '28px', fontWeight: 700, fontStyle: 'italic', color: '#ef4444', margin: 0 },
   chartBox: { backgroundColor: 'rgba(88,28,135,0.05)', padding: '32px', borderRadius: '3rem', border: '1px solid rgba(168,85,247,0.1)', height: '500px' },
   chartTitle: { fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' as const, letterSpacing: '0.1em', color: '#a855f7', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' },
+  funilBox: { marginTop: '32px', backgroundColor: 'rgba(88,28,135,0.05)', padding: '32px', borderRadius: '3rem', border: '1px solid rgba(168,85,247,0.1)' },
+  funilHeader: { display: 'flex', flexWrap: 'wrap' as const, justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px' },
+  funilGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' },
+  pipelineCard: { backgroundColor: 'rgba(88,28,135,0.15)', borderRadius: '1.5rem', border: '1px solid rgba(168,85,247,0.15)', padding: '20px' },
+  pipelineTitle: { fontSize: '11px', fontWeight: 900, color: '#c084fc', textTransform: 'uppercase' as const, marginBottom: '4px' },
+  pipelineTotal: { fontSize: '9px', color: '#a855f7', marginBottom: '16px' },
+  statusRow: { marginBottom: '10px' },
+  statusLabel: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#faf5ff', marginBottom: '4px' },
+  statusBarTrack: { width: '100%', height: '8px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' as const },
+  statusBarFill: (pct: number): React.CSSProperties => ({ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #7c3aed, #c084fc)' }),
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -366,6 +376,65 @@ export default function Dashboard() {
     ? dadosPorDia
     : todosClientes.filter(c => gestorAtivo === 'Todos' ? c.estourouMeta : true);
 
+  // ─── FUNIL DE CRM (Kommo / RD Station) ────────────────────────────────────
+  // crm_funnel_snapshot guarda uma "foto" do funil por dia (quantos leads estão
+  // em cada status, não quantos entraram naquele dia) — por isso busca só a
+  // data mais recente disponível, em vez de somar um período.
+  const [funilCrm, setFunilCrm] = useState<'kommo' | 'rdstation'>('kommo');
+  const [funilData, setFunilData] = useState<AdsData[]>([]);
+  const [funilDataRef, setFunilDataRef] = useState<string | null>(null);
+  const [funilLoading, setFunilLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchFunil() {
+      setFunilLoading(true);
+      const { data: ultima } = await supabase
+        .from('crm_funnel_snapshot')
+        .select('date')
+        .eq('crm', funilCrm)
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!ultima) {
+        setFunilData([]);
+        setFunilDataRef(null);
+        setFunilLoading(false);
+        return;
+      }
+
+      const { data: rows } = await supabase
+        .from('crm_funnel_snapshot')
+        .select('*')
+        .eq('crm', funilCrm)
+        .eq('date', ultima.date);
+
+      setFunilData(rows ?? []);
+      setFunilDataRef(ultima.date);
+      setFunilLoading(false);
+    }
+    fetchFunil();
+  }, [funilCrm]);
+
+  const funilPorPipeline = useMemo(() => {
+    const grupos: Record<string, {
+      pipeline: string;
+      statuses: { nome: string; leads: number; valor: number }[];
+      totalLeads: number;
+      totalValor: number;
+    }> = {};
+    funilData.forEach(row => {
+      const pipeline = row.pipeline_name || 'Sem pipeline';
+      if (!grupos[pipeline]) grupos[pipeline] = { pipeline, statuses: [], totalLeads: 0, totalValor: 0 };
+      const leads = parseInt(row.lead_count) || 0;
+      const valor = parseFloat(row.deal_value) || 0;
+      grupos[pipeline].statuses.push({ nome: row.status_name || row.status_id, leads, valor });
+      grupos[pipeline].totalLeads += leads;
+      grupos[pipeline].totalValor += valor;
+    });
+    return Object.values(grupos).sort((a, b) => b.totalLeads - a.totalLeads);
+  }, [funilData]);
+
   if (!isMounted) return null;
 
   return (
@@ -510,6 +579,46 @@ export default function Dashboard() {
             clienteSelecionado={clienteSelecionado}
             onSelect={(nome) => setClienteSelecionado(prev => prev === nome ? null : nome)}
           />
+        </div>
+
+        {/* ─── FUNIL DE CRM ──────────────────────────────────────────────── */}
+        <div style={S.funilBox}>
+          <div style={S.funilHeader}>
+            <h3 style={S.chartTitle}>
+              🧭 Funil de CRM {funilDataRef ? `— ${new Date(`${funilDataRef}T00:00:00`).toLocaleDateString('pt-BR')}` : ''}
+            </h3>
+            <div style={S.platformSwitch}>
+              <button onClick={() => setFunilCrm('kommo')} style={S.btnMeta(funilCrm === 'kommo')}>Kommo</button>
+              <button onClick={() => setFunilCrm('rdstation')} style={S.btnGoogle(funilCrm === 'rdstation')}>RD Station</button>
+            </div>
+            {funilLoading && <span style={S.loading}>CARREGANDO FUNIL...</span>}
+          </div>
+
+          {!funilLoading && funilPorPipeline.length === 0 && (
+            <p style={{ color: '#a855f7', fontSize: '11px' }}>Nenhum snapshot de funil encontrado pra {funilCrm === 'kommo' ? 'Kommo' : 'RD Station'} ainda.</p>
+          )}
+
+          <div style={S.funilGrid}>
+            {funilPorPipeline.map(p => (
+              <div key={p.pipeline} style={S.pipelineCard}>
+                <p style={S.pipelineTitle}>{p.pipeline}</p>
+                <p style={S.pipelineTotal}>{p.totalLeads} leads · R$ {p.totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                {p.statuses
+                  .sort((a, b) => b.leads - a.leads)
+                  .map(s => (
+                    <div key={s.nome} style={S.statusRow}>
+                      <div style={S.statusLabel}>
+                        <span>{s.nome}</span>
+                        <span>{s.leads}</span>
+                      </div>
+                      <div style={S.statusBarTrack}>
+                        <div style={S.statusBarFill(p.totalLeads > 0 ? (s.leads / p.totalLeads) * 100 : 0)} />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </main>
