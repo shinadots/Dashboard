@@ -215,9 +215,8 @@ export default function Dashboard() {
       dataCol: 'date',
     },
     google_ads: {
-      // TODO: confirmar esses nomes quando o Windsor for configurado pro Google
-      // Ads (mesmo processo já feito pro Meta Ads) — por enquanto é um palpite
-      // baseado no padrão que o Windsor usou pro meta_ads.
+      // Google Ads vem do ETL Python (API oficial), não do Windsor — a
+      // tabela google_ads já é criada por nós com esses nomes de coluna.
       idField: 'conta_google_id',
       metaField: 'meta_cpl_google',
       leadsCol: 'conversions',
