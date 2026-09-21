@@ -405,6 +405,34 @@ export default function Dashboard() {
     });
   }, []);
 
+  // Mapeia pipeline do CRM -> cliente do clientes_config, pra poder aplicar
+  // os mesmos filtros de Gestor/Squad que a aba de Anúncios usa.
+  const [pipelineCliente, setPipelineCliente] = useState<AdsData[]>([]);
+  useEffect(() => {
+    supabase.from('pipeline_cliente').select('*').then(({ data, error }) => {
+      if (!error && data) setPipelineCliente(data);
+    });
+  }, []);
+
+  const gestorSquadByPipeline = useMemo(() => {
+    const clienteByPipeline = new Map<string, string>();
+    pipelineCliente.forEach(row => {
+      clienteByPipeline.set(`${row.crm}|${row.pipeline_name}`, row.cliente);
+    });
+    const configByCliente = new Map<string, AdsData>();
+    clientesConfig.forEach(c => configByCliente.set(c.cliente, c));
+
+    const map = new Map<string, { gestor: string | null; squad: string | null }>();
+    pipelineCliente.forEach(row => {
+      const config = configByCliente.get(clienteByPipeline.get(`${row.crm}|${row.pipeline_name}`) || '');
+      map.set(`${row.crm}|${row.pipeline_name}`, {
+        gestor: config?.gestor ?? null,
+        squad: config?.squad != null ? String(config.squad) : null,
+      });
+    });
+    return map;
+  }, [pipelineCliente, clientesConfig]);
+
   const categoriaByKey = useMemo(() => {
     const map = new Map<string, string>();
     statusCategoria.forEach(row => {
@@ -432,10 +460,22 @@ export default function Dashboard() {
 
   useEffect(() => { setFunilMarca(''); }, [funilCrm]);
 
+  // Mesmos filtros de Gestor/Squad da aba de Anúncios, aplicados via o
+  // mapeamento pipeline -> cliente.
+  const funilDataFiltrado = useMemo(() => {
+    return funilData.filter(row => {
+      const gs = gestorSquadByPipeline.get(`${row.crm}|${row.pipeline_name}`);
+      return (
+        (gestorAtivo === 'Todos' || gs?.gestor === gestorAtivo) &&
+        (squadAtivo === 'Todos' || gs?.squad === squadAtivo)
+      );
+    });
+  }, [funilData, gestorSquadByPipeline, gestorAtivo, squadAtivo]);
+
   const marcasDisponiveis = useMemo(() => {
-    const nomes = [...new Set(funilData.map(r => r.pipeline_name).filter(Boolean))] as string[];
+    const nomes = [...new Set(funilDataFiltrado.map(r => r.pipeline_name).filter(Boolean))] as string[];
     return nomes.sort();
-  }, [funilData]);
+  }, [funilDataFiltrado]);
 
   const CATEGORIA_LABELS: Record<string, string> = {
     leads_frios: 'Leads frios',
@@ -455,29 +495,32 @@ export default function Dashboard() {
   // reais daquele pipeline, do jeito que ele foi configurado no CRM.
   const funilVisao = useMemo(() => {
     if (funilMarca) {
-      const dadosMarca = funilData.filter(r => r.pipeline_name === funilMarca);
-      const statuses: Record<string, { nome: string; leads: number; valor: number }> = {};
+      const dadosMarca = funilDataFiltrado.filter(r => r.pipeline_name === funilMarca);
+      const statuses: Record<string, { nome: string; leads: number; valor: number; categoria: string }> = {};
       let totalLeads = 0, totalValor = 0;
       dadosMarca.forEach(row => {
         const nome = row.status_name || row.status_id || 'Sem status';
-        if (!statuses[nome]) statuses[nome] = { nome, leads: 0, valor: 0 };
+        if (!statuses[nome]) {
+          const categoria = categoriaByKey.get(`${row.crm}|${row.pipeline_name}|${row.status_name}`) || 'nao_mapeado';
+          statuses[nome] = { nome, leads: 0, valor: 0, categoria };
+        }
         const valor = parseFloat(row.price) || 0;
         statuses[nome].leads += 1;
         statuses[nome].valor += valor;
         totalLeads += 1;
         totalValor += valor;
       });
-      return {
-        modo: 'marca' as const,
-        etapas: Object.values(statuses).sort((a, b) => b.leads - a.leads),
-        totalLeads,
-        totalValor,
-      };
+      // Ordena pela posição da categoria no funil (frio → morno → avançado →
+      // reunião → cof → venda/perdidos), não pelo volume de leads.
+      const etapas = Object.values(statuses).sort(
+        (a, b) => CATEGORIA_ORDEM.indexOf(a.categoria) - CATEGORIA_ORDEM.indexOf(b.categoria)
+      );
+      return { modo: 'marca' as const, etapas, totalLeads, totalValor };
     }
 
     const categorias: Record<string, { leads: number; valor: number }> = {};
     let totalLeads = 0, totalValor = 0;
-    funilData.forEach(row => {
+    funilDataFiltrado.forEach(row => {
       const key = `${row.crm}|${row.pipeline_name}|${row.status_name}`;
       const categoria = categoriaByKey.get(key) || 'nao_mapeado';
       if (!categorias[categoria]) categorias[categoria] = { leads: 0, valor: 0 };
@@ -495,7 +538,7 @@ export default function Dashboard() {
       totalLeads,
       totalValor,
     };
-  }, [funilMarca, funilData, categoriaByKey]);
+  }, [funilMarca, funilDataFiltrado, categoriaByKey]);
 
   if (!isMounted) return null;
 
@@ -559,11 +602,23 @@ export default function Dashboard() {
                   <button onClick={() => setFunilCrm('rdstation')} style={S.btnGoogle(funilCrm === 'rdstation')}>RD Station</button>
                 </div>
 
-                {/* ─── FILTRO DE MARCA ────────────────────────────────────────── */}
-                <select style={S.select} value={funilMarca} onChange={e => setFunilMarca(e.target.value)}>
-                  <option value="">Visão geral (todas as marcas)</option>
-                  {marcasDisponiveis.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+                {/* ─── FILTROS GESTOR + SQUAD + MARCA ─────────────────────────── */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <select style={S.select} value={gestorAtivo} onChange={e => setGestorAtivo(e.target.value)}>
+                    <option value="Todos">Visão Geral (Apenas S.O.S)</option>
+                    {opcoesGestores.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+
+                  <select style={S.select} value={squadAtivo} onChange={e => setSquadAtivo(e.target.value)}>
+                    <option value="Todos">Todos os Squads</option>
+                    {opcoesSquads.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+
+                  <select style={S.select} value={funilMarca} onChange={e => setFunilMarca(e.target.value)}>
+                    <option value="">Visão geral (todas as marcas)</option>
+                    {marcasDisponiveis.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
                 {/* ─────────────────────────────────────────────────────────────── */}
               </>
             )}
@@ -681,7 +736,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {!funilLoading && funilData.length === 0 && (
+          {!funilLoading && funilDataFiltrado.length === 0 && (
             <p style={{ color: '#a855f7', fontSize: '11px' }}>Nenhum lead encontrado pra {funilCrm === 'kommo' ? 'Kommo' : 'RD Station'} nesse período.</p>
           )}
 
@@ -691,7 +746,7 @@ export default function Dashboard() {
                 <div key={s.nome} style={S.statusRow}>
                   <div style={S.statusLabel}>
                     <span>{s.nome}</span>
-                    <span>{s.leads} · R$ {s.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>{s.leads} leads · {funilVisao.totalLeads > 0 ? ((s.leads / funilVisao.totalLeads) * 100).toFixed(1) : '0'}%</span>
                   </div>
                   <div style={S.statusBarTrack}>
                     <div style={S.statusBarFill(funilVisao.totalLeads > 0 ? (s.leads / funilVisao.totalLeads) * 100 : 0)} />
