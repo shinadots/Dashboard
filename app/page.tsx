@@ -210,7 +210,9 @@ export default function Dashboard() {
     meta_ads: {
       idField: 'conta_fb_id',
       metaField: 'meta_cpl_fb',
-      leadsCol: 'actions_lead',
+      // Soma leads de formulário nativo/pixel (actions_lead) + conversas de
+      // WhatsApp iniciadas (campanhas de mensagem) — as duas contam como lead.
+      leadsCols: ['actions_lead', 'actions_onsite_conversion_messaging_conversation_started_7d__dv0'],
       gastoCol: 'spend',
       dataCol: 'date',
     },
@@ -219,11 +221,21 @@ export default function Dashboard() {
       // tabela google_ads já é criada por nós com esses nomes de coluna.
       idField: 'conta_google_id',
       metaField: 'meta_cpl_google',
-      leadsCol: 'conversions',
+      leadsCols: ['conversions'],
       gastoCol: 'spend',
       dataCol: 'date',
     },
   } as const;
+
+  // Soma o valor de uma ou mais colunas de "lead" numa linha — meta_ads tem
+  // duas (formulário + WhatsApp), google_ads só uma. Parsing inline (não usa
+  // o `parse` do componente) porque essa função é definida antes dele.
+  const sumLeadsCols = (row: AdsData, cols: readonly string[]) =>
+    cols.reduce((total, col) => {
+      const val = row[col];
+      const num = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : parseFloat(val);
+      return total + (isNaN(num) ? 0 : num);
+    }, 0);
 
   const [clientesConfig, setClientesConfig] = useState<AdsData[]>([]);
 
@@ -267,7 +279,6 @@ export default function Dashboard() {
   useEffect(() => {
     setIsMounted(true);
     setClienteSelecionado(null);
-    setSquadAtivo('Todos');
     async function fetchData() {
       setLoading(true);
       let allData: AdsData[] = [];
@@ -330,22 +341,24 @@ export default function Dashboard() {
   }, [dadosEnriquecidos, gestorAtivo, squadAtivo]);
 
   const todosClientes = useMemo(() => {
-    const { leadsCol, gastoCol } = PLATFORM_CONFIG[plataforma];
+    const { leadsCols, gastoCol } = PLATFORM_CONFIG[plataforma];
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
     const nomes = [...new Set(dadosFiltrados.map(i => i._cliente?.trim()))].filter(Boolean) as string[];
     return nomes.map(nome => {
       const regs = dadosFiltrados.filter(d => d._cliente?.trim() === nome);
       const gasto = parseFloat(regs.reduce((a, c) => a + parse(c[gastoCol]), 0).toFixed(2));
-      const leads = regs.reduce((a, c) => a + parse(c[leadsCol]), 0);
+      const leads = regs.reduce((a, c) => a + sumLeadsCols(c, leadsCols), 0);
       const meta = regs[0]._meta ?? 0;
-      const cpl = parseFloat((leads > 0 ? gasto / leads : 0).toFixed(2));
+      // Sem leads: CPL vira o próprio valor gasto (não zero) — assim o card
+      // continua sinalizando estouro de meta mesmo sem nenhum lead registrado.
+      const cpl = parseFloat((leads > 0 ? gasto / leads : gasto).toFixed(2));
       return { nome, gasto, leads, cpl, meta, estourouMeta: meta > 0 && cpl > meta };
     }).sort((a, b) => a.estourouMeta === b.estourouMeta ? b.cpl - a.cpl : a.estourouMeta ? -1 : 1);
   }, [dadosFiltrados, plataforma]);
 
   const dadosPorDia = useMemo(() => {
     if (!clienteSelecionado) return [];
-    const { leadsCol, gastoCol, dataCol } = PLATFORM_CONFIG[plataforma];
+    const { leadsCols, gastoCol, dataCol } = PLATFORM_CONFIG[plataforma];
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
     const registros = dadosFiltrados.filter(d => d._cliente?.trim() === clienteSelecionado);
     const agrupado: Record<string, { data: string; gasto: number; leads: number }> = {};
@@ -354,10 +367,10 @@ export default function Dashboard() {
       if (!dia) return;
       if (!agrupado[dia]) agrupado[dia] = { data: dia, gasto: 0, leads: 0 };
       agrupado[dia].gasto += parse(r[gastoCol]);
-      agrupado[dia].leads += parse(r[leadsCol]);
+      agrupado[dia].leads += sumLeadsCols(r, leadsCols);
     });
     return Object.values(agrupado)
-      .map(d => ({ ...d, cpl: d.leads > 0 ? parseFloat((d.gasto / d.leads).toFixed(2)) : 0 }))
+      .map(d => ({ ...d, cpl: parseFloat((d.leads > 0 ? d.gasto / d.leads : d.gasto).toFixed(2)) }))
       .sort((a, b) => a.data.localeCompare(b.data));
   }, [clienteSelecionado, dadosFiltrados, plataforma]);
 
@@ -368,7 +381,7 @@ export default function Dashboard() {
     : dadosFiltrados.reduce((a, c) => a + parse(c[PLATFORM_CONFIG[plataforma].gastoCol]), 0);
   const totalLeads = clienteSelecionado
     ? dadosPorDia.reduce((a, c) => a + c.leads, 0)
-    : dadosFiltrados.reduce((a, c) => a + parse(c[PLATFORM_CONFIG[plataforma].leadsCol]), 0);
+    : dadosFiltrados.reduce((a, c) => a + sumLeadsCols(c, PLATFORM_CONFIG[plataforma].leadsCols), 0);
   const totalSOS = todosClientes.filter(c => c.estourouMeta).length;
 
   const dadosGrafico = clienteSelecionado
