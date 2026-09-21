@@ -488,40 +488,36 @@ export default function Dashboard() {
     perdidos: 'Perdidos',
     nao_mapeado: 'Não mapeado',
   };
-  const CATEGORIA_ORDEM = ['leads_frios', 'leads_mornos', 'leads_avancados', 'reuniao_agendada', 'reuniao_realizada', 'cof', 'venda', 'perdidos', 'nao_mapeado'];
 
   // Sem marca selecionada: agrupa TODOS os pipelines pelas 8 categorias
   // padrão (via status_categoria). Com marca selecionada: mostra os status
   // reais daquele pipeline, do jeito que ele foi configurado no CRM.
   const funilVisao = useMemo(() => {
+    // .trim() no status_name pro lookup bater mesmo quando o Kommo manda o
+    // status com espaço sobrando (ex: "CONTATO REALIZADO " com espaço no fim).
     if (funilMarca) {
       const dadosMarca = funilDataFiltrado.filter(r => r.pipeline_name === funilMarca);
-      const statuses: Record<string, { nome: string; leads: number; valor: number; categoria: string }> = {};
+      const statuses: Record<string, { nome: string; leads: number; valor: number }> = {};
       let totalLeads = 0, totalValor = 0;
       dadosMarca.forEach(row => {
-        const nome = row.status_name || row.status_id || 'Sem status';
-        if (!statuses[nome]) {
-          const categoria = categoriaByKey.get(`${row.crm}|${row.pipeline_name}|${row.status_name}`) || 'nao_mapeado';
-          statuses[nome] = { nome, leads: 0, valor: 0, categoria };
-        }
+        const nome = row.status_name?.trim() || row.status_id || 'Sem status';
+        if (!statuses[nome]) statuses[nome] = { nome, leads: 0, valor: 0 };
         const valor = parseFloat(row.price) || 0;
         statuses[nome].leads += 1;
         statuses[nome].valor += valor;
         totalLeads += 1;
         totalValor += valor;
       });
-      // Ordena pela posição da categoria no funil (frio → morno → avançado →
-      // reunião → cof → venda/perdidos), não pelo volume de leads.
-      const etapas = Object.values(statuses).sort(
-        (a, b) => CATEGORIA_ORDEM.indexOf(a.categoria) - CATEGORIA_ORDEM.indexOf(b.categoria)
-      );
+      // Maior % primeiro — mais fácil de ler de cara qual etapa concentra
+      // mais leads.
+      const etapas = Object.values(statuses).sort((a, b) => b.leads - a.leads);
       return { modo: 'marca' as const, etapas, totalLeads, totalValor };
     }
 
     const categorias: Record<string, { leads: number; valor: number }> = {};
     let totalLeads = 0, totalValor = 0;
     funilDataFiltrado.forEach(row => {
-      const key = `${row.crm}|${row.pipeline_name}|${row.status_name}`;
+      const key = `${row.crm}|${row.pipeline_name}|${row.status_name?.trim()}`;
       const categoria = categoriaByKey.get(key) || 'nao_mapeado';
       if (!categorias[categoria]) categorias[categoria] = { leads: 0, valor: 0 };
       const valor = parseFloat(row.price) || 0;
@@ -532,13 +528,14 @@ export default function Dashboard() {
     });
     return {
       modo: 'geral' as const,
-      etapas: CATEGORIA_ORDEM
-        .filter(c => categorias[c])
-        .map(c => ({ nome: CATEGORIA_LABELS[c], leads: categorias[c].leads, valor: categorias[c].valor })),
+      etapas: Object.entries(categorias)
+        .map(([c, v]) => ({ nome: CATEGORIA_LABELS[c] || c, leads: v.leads, valor: v.valor }))
+        .sort((a, b) => b.leads - a.leads),
       totalLeads,
       totalValor,
     };
   }, [funilMarca, funilDataFiltrado, categoriaByKey]);
+
 
   if (!isMounted) return null;
 
