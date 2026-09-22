@@ -19,6 +19,7 @@ const S = {
   platformSwitch: { display: 'flex', backgroundColor: 'rgba(88,28,135,0.4)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(126,34,206,0.5)' },
   btnMeta: (active: boolean): React.CSSProperties => ({ padding: '8px 24px', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: active ? '#2563eb' : 'transparent', color: active ? '#fff' : '#a855f7' }),
   btnGoogle: (active: boolean): React.CSSProperties => ({ padding: '8px 24px', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: active ? '#eab308' : 'transparent', color: active ? '#000' : '#a855f7' }),
+  btnNeutro: (active: boolean): React.CSSProperties => ({ padding: '8px 24px', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: active ? '#7c3aed' : 'transparent', color: active ? '#fff' : '#a855f7' }),
   select: { appearance: 'none' as const, backgroundColor: 'rgba(88,28,135,0.4)', color: '#fff', fontWeight: 700, padding: '8px 32px', borderRadius: '9999px', border: '1px solid rgba(126,34,206,0.5)', fontSize: '10px', textTransform: 'uppercase' as const, outline: 'none', cursor: 'pointer', minWidth: '200px' },
   periodGroup: { display: 'flex', backgroundColor: 'rgba(88,28,135,0.3)', padding: '4px', borderRadius: '9999px', border: '1px solid rgba(126,34,206,0.5)' },
   btnPeriod: (active: boolean): React.CSSProperties => ({ padding: '8px 24px', borderRadius: '9999px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', border: 'none', cursor: 'pointer', background: active ? '#7c3aed' : 'transparent', color: active ? '#fff' : '#a855f7' }),
@@ -47,6 +48,15 @@ const S = {
   statusLabel: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#faf5ff', marginBottom: '4px' },
   statusBarTrack: { width: '100%', height: '8px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' as const },
   statusBarFill: (pct: number): React.CSSProperties => ({ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #7c3aed, #c084fc)' }),
+  resumoGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '14px' },
+  resumoCard: (alerta: boolean): React.CSSProperties => ({
+    backgroundColor: alerta ? 'rgba(127,29,29,0.25)' : 'rgba(88,28,135,0.15)',
+    border: `1px solid ${alerta ? 'rgba(248,113,113,0.4)' : 'rgba(168,85,247,0.15)'}`,
+    borderRadius: '1.25rem', padding: '16px',
+  }),
+  resumoNome: { fontSize: '11px', fontWeight: 900, color: '#c084fc', textTransform: 'uppercase' as const, marginBottom: '10px' },
+  resumoLinha: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#e9d5ff', marginBottom: '4px' },
+  resumoDestaque: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 800, color: '#fff', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(168,85,247,0.15)' },
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -193,7 +203,7 @@ function ClienteSidebar({
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [data, setData] = useState<AdsData[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'anuncios' | 'funil'>('anuncios');
+  const [abaAtiva, setAbaAtiva] = useState<'geral' | 'anuncios' | 'funil'>('geral');
   const [plataforma, setPlataforma] = useState<'meta_ads' | 'google_ads'>('meta_ads');
   const [gestorAtivo, setGestorAtivo] = useState('Todos');
   const [squadAtivo, setSquadAtivo] = useState('Todos'); // ← NOVO
@@ -536,6 +546,127 @@ export default function Dashboard() {
     };
   }, [funilMarca, funilDataFiltrado, categoriaByKey]);
 
+  // ─── COMPILADO GERAL (home) ────────────────────────────────────────────
+  // Busca Meta Ads + Google Ads + CRM Leads ao mesmo tempo (só quando essa
+  // aba está visível) pra montar um card por marca com investimento
+  // combinado e os percentuais do funil.
+  const [resumoLoading, setResumoLoading] = useState(false);
+  const [resumoMeta, setResumoMeta] = useState<AdsData[]>([]);
+  const [resumoGoogle, setResumoGoogle] = useState<AdsData[]>([]);
+  const [resumoCrm, setResumoCrm] = useState<AdsData[]>([]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'geral') return;
+    async function fetchAdsTabela(tabela: 'meta_ads' | 'google_ads') {
+      let all: AdsData[] = [];
+      let hasMore = true;
+      let page = 0;
+      const pageSize = 1000;
+      while (hasMore) {
+        const from = page * pageSize;
+        let query = supabase.from(tabela).select('*').not('account_id', 'is', null);
+        if (rangeInicio) query = query.gte('date', rangeInicio);
+        if (rangeFimExclusivo) query = query.lt('date', rangeFimExclusivo);
+        const { data, error } = await query.range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) { hasMore = false; }
+        else { all = [...all, ...data]; if (data.length < pageSize) hasMore = false; else page++; }
+      }
+      return all;
+    }
+
+    async function fetchResumo() {
+      setResumoLoading(true);
+      const [meta, google] = await Promise.all([fetchAdsTabela('meta_ads'), fetchAdsTabela('google_ads')]);
+
+      // Aqui é "criado no período" de verdade (created_at), diferente do
+      // funilData lá em cima que também considera updated_at.
+      let crmQuery = supabase.from('crm_leads').select('*');
+      if (rangeInicio) crmQuery = crmQuery.gte('created_at', rangeInicio);
+      if (rangeFimExclusivo) crmQuery = crmQuery.lt('created_at', rangeFimExclusivo);
+      const { data: crm } = await crmQuery;
+
+      setResumoMeta(meta);
+      setResumoGoogle(google);
+      setResumoCrm(crm ?? []);
+      setResumoLoading(false);
+    }
+    fetchResumo();
+  }, [abaAtiva, rangeInicio, rangeFimExclusivo]);
+
+  // Categorias que contam como "avançado" pro % do compilado geral.
+  const CATEGORIAS_AVANCADAS = ['leads_avancados', 'reuniao_agendada', 'reuniao_realizada', 'cof', 'venda'];
+
+  const resumoPorMarca = useMemo(() => {
+    const parseNum = (v: any) => { const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : parseFloat(v); return isNaN(n) ? 0 : n; };
+
+    const configByFbId = new Map<string, AdsData>();
+    const configByGoogleId = new Map<string, AdsData>();
+    clientesConfig.forEach(c => {
+      if (c.conta_fb_id) configByFbId.set(String(c.conta_fb_id), c);
+      if (c.conta_google_id) configByGoogleId.set(String(c.conta_google_id), c);
+    });
+
+    const clienteByPipeline = new Map<string, string>();
+    pipelineCliente.forEach(row => clienteByPipeline.set(`${row.crm}|${row.pipeline_name}`, row.cliente));
+
+    type Marca = {
+      nome: string; investimentoMeta: number; investimentoGoogle: number;
+      leadsMeta: number; leadsGoogle: number;
+      leadsCriados: number; leadsAvancados: number; leadsPerdidos: number;
+    };
+    const marcas: Record<string, Marca> = {};
+    const get = (nome: string) => {
+      if (!marcas[nome]) marcas[nome] = { nome, investimentoMeta: 0, investimentoGoogle: 0, leadsMeta: 0, leadsGoogle: 0, leadsCriados: 0, leadsAvancados: 0, leadsPerdidos: 0 };
+      return marcas[nome];
+    };
+
+    resumoMeta.forEach(row => {
+      const config = configByFbId.get(String(row.account_id));
+      if (!config) return;
+      const m = get(config.cliente);
+      m.investimentoMeta += parseNum(row.spend);
+      m.leadsMeta += sumLeadsCols(row, PLATFORM_CONFIG.meta_ads.leadsCols);
+    });
+
+    resumoGoogle.forEach(row => {
+      const config = configByGoogleId.get(String(row.account_id));
+      if (!config) return;
+      const m = get(config.cliente);
+      m.investimentoGoogle += parseNum(row.spend);
+      m.leadsGoogle += sumLeadsCols(row, PLATFORM_CONFIG.google_ads.leadsCols);
+    });
+
+    resumoCrm.forEach(row => {
+      const cliente = clienteByPipeline.get(`${row.crm}|${row.pipeline_name}`);
+      if (!cliente) return; // pipeline sem mapeamento pra cliente — não entra no compilado
+      const m = get(cliente);
+      const categoria = categoriaByKey.get(`${row.crm}|${row.pipeline_name}|${row.status_name?.trim()}`) || 'nao_mapeado';
+      m.leadsCriados += 1;
+      if (CATEGORIAS_AVANCADAS.includes(categoria)) m.leadsAvancados += 1;
+      if (categoria === 'perdidos') m.leadsPerdidos += 1;
+    });
+
+    return Object.values(marcas).map(m => {
+      const gastoTotal = parseFloat((m.investimentoMeta + m.investimentoGoogle).toFixed(2));
+      const leadsAds = m.leadsMeta + m.leadsGoogle;
+      const cpl = parseFloat((leadsAds > 0 ? gastoTotal / leadsAds : gastoTotal).toFixed(2));
+      const pctAvancados = m.leadsCriados > 0 ? (m.leadsAvancados / m.leadsCriados) * 100 : 0;
+      const pctPerdidos = m.leadsCriados > 0 ? (m.leadsPerdidos / m.leadsCriados) * 100 : 0;
+      return { ...m, gastoTotal, leadsAds, cpl, pctAvancados, pctPerdidos };
+    }).sort((a, b) => b.gastoTotal - a.gastoTotal);
+  }, [resumoMeta, resumoGoogle, resumoCrm, clientesConfig, pipelineCliente, categoriaByKey]);
+
+  const resumoFiltrado = useMemo(() => {
+    const configByCliente = new Map<string, AdsData>();
+    clientesConfig.forEach(c => configByCliente.set(c.cliente, c));
+    return resumoPorMarca.filter(m => {
+      const config = configByCliente.get(m.nome);
+      return (
+        (gestorAtivo === 'Todos' || config?.gestor === gestorAtivo) &&
+        (squadAtivo === 'Todos' || (config?.squad != null && String(config.squad) === squadAtivo))
+      );
+    });
+  }, [resumoPorMarca, clientesConfig, gestorAtivo, squadAtivo]);
 
   if (!isMounted) return null;
 
@@ -567,11 +698,28 @@ export default function Dashboard() {
 
             {/* ─── ABAS ────────────────────────────────────────────────────── */}
             <div style={S.platformSwitch}>
+              <button onClick={() => setAbaAtiva('geral')} style={S.btnNeutro(abaAtiva === 'geral')}>Compilado Geral</button>
               <button onClick={() => setAbaAtiva('anuncios')} style={S.btnMeta(abaAtiva === 'anuncios')}>Anúncios</button>
               <button onClick={() => setAbaAtiva('funil')} style={S.btnGoogle(abaAtiva === 'funil')}>Funil de CRM</button>
             </div>
 
-            {abaAtiva === 'anuncios' ? (
+            {abaAtiva === 'geral' ? (
+              <>
+                {/* ─── FILTROS GESTOR + SQUAD ─────────────────────────────────── */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <select style={S.select} value={gestorAtivo} onChange={e => setGestorAtivo(e.target.value)}>
+                    <option value="Todos">Visão Geral (Apenas S.O.S)</option>
+                    {opcoesGestores.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+
+                  <select style={S.select} value={squadAtivo} onChange={e => setSquadAtivo(e.target.value)}>
+                    <option value="Todos">Todos os Squads</option>
+                    {opcoesSquads.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                {/* ─────────────────────────────────────────────────────────────── */}
+              </>
+            ) : abaAtiva === 'anuncios' ? (
               <>
                 <div style={S.platformSwitch}>
                   <button onClick={() => setPlataforma('meta_ads')} style={S.btnMeta(plataforma === 'meta_ads')}>Meta Ads</button>
@@ -637,7 +785,11 @@ export default function Dashboard() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {(abaAtiva === 'anuncios' ? loading : funilLoading) && <span style={S.loading}>{abaAtiva === 'anuncios' ? 'SINCRONIZANDO SUPABASE...' : 'CARREGANDO FUNIL...'}</span>}
+              {(abaAtiva === 'geral' ? resumoLoading : abaAtiva === 'anuncios' ? loading : funilLoading) && (
+                <span style={S.loading}>
+                  {abaAtiva === 'geral' ? 'CARREGANDO RESUMO...' : abaAtiva === 'anuncios' ? 'SINCRONIZANDO SUPABASE...' : 'CARREGANDO FUNIL...'}
+                </span>
+              )}
               {abaAtiva === 'anuncios' && clienteSelecionado && (
                 <button
                   onClick={() => setClienteSelecionado(null)}
@@ -654,6 +806,35 @@ export default function Dashboard() {
             </div>
           </div>
         </header>
+
+        {abaAtiva === 'geral' && (
+        <div style={S.funilBox}>
+          <div style={S.funilHeader}>
+            <h3 style={S.chartTitle}>📊 Compilado Geral — todas as marcas</h3>
+            <p style={{ color: '#a855f7', fontSize: '10px' }}>{resumoFiltrado.length} marcas com atividade no período</p>
+          </div>
+
+          {!resumoLoading && resumoFiltrado.length === 0 && (
+            <p style={{ color: '#a855f7', fontSize: '11px' }}>Nenhuma atividade encontrada nesse período.</p>
+          )}
+
+          <div style={S.resumoGrid}>
+            {resumoFiltrado.map(m => (
+              <div key={m.nome} style={S.resumoCard(m.pctPerdidos >= 50)}>
+                <p style={S.resumoNome}>{m.nome}</p>
+                <div style={S.resumoLinha}><span>Investido Meta</span><span>R$ {m.investimentoMeta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div style={S.resumoLinha}><span>Investido Google</span><span>R$ {m.investimentoGoogle.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div style={S.resumoLinha}><span>Leads (anúncios)</span><span>{m.leadsAds}</span></div>
+                <div style={S.resumoDestaque}><span>Gasto total</span><span>R$ {m.gastoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div style={S.resumoDestaque}><span>CPL</span><span>R$ {m.cpl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div style={{ ...S.resumoLinha, marginTop: '8px' }}><span>% avançados</span><span style={{ color: '#4ade80' }}>{m.pctAvancados.toFixed(1)}%</span></div>
+                <div style={S.resumoLinha}><span>% perdidos</span><span style={{ color: m.pctPerdidos >= 50 ? '#f87171' : '#e9d5ff' }}>{m.pctPerdidos.toFixed(1)}%</span></div>
+                <div style={{ ...S.resumoLinha, opacity: 0.6 }}><span>Leads criados (CRM)</span><span>{m.leadsCriados}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        )}
 
         {abaAtiva === 'anuncios' && (
         <div className="main-grid" style={S.grid}>
