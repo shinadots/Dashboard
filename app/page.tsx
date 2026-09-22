@@ -223,7 +223,7 @@ export default function Dashboard() {
       metaField: 'meta_cpl_fb',
       // Soma leads de formulário nativo/pixel (actions_lead) + conversas de
       // WhatsApp iniciadas (campanhas de mensagem) — as duas contam como lead.
-      leadsCols: ['actions_lead', 'actions_onsite_conversion_messaging_conversation_started_7d__dv0'],
+      leadsCols: ['actions_lead', 'actions_onsite_conversion_messaging_conversation_started_7d'],
       gastoCol: 'spend',
       dataCol: 'date',
     },
