@@ -65,7 +65,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     return (
       <div style={{ backgroundColor: '#0a051a', border: '1px solid #4b2a85', borderRadius: '20px', padding: '12px 16px' }}>
         <p style={{ color: '#fff', fontWeight: 'bold', marginBottom: '8px', fontSize: '12px' }}>{data.nome || data.data}</p>
-        <p style={{ color: '#fff', fontSize: '11px', marginBottom: '4px' }}>Resultado: <b>{Math.round(data.leads)}</b></p>
+        <p style={{ color: '#fff', fontSize: '11px', marginBottom: '4px' }}>Resultado: <b>{Math.floor(data.leads)}</b></p>
         <p style={{ color: '#fff', fontSize: '11px', marginBottom: '4px' }}>CPL: <b>R$ {data.cpl.toFixed(2)}</b></p>
         <p style={{ color: '#fff', fontSize: '11px' }}>Investimento: <b>R$ {data.gasto.toFixed(2)}</b></p>
       </div>
@@ -181,7 +181,7 @@ function ClienteSidebar({
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>{Math.round(c.leads)} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>{Math.floor(c.leads)} {plataforma === 'meta_ads' ? 'Leads' : 'Conv.'}</span>
                   <span style={{ fontWeight: 600, color: c.estourouMeta ? '#ff4d6d' : '#00e5a0' }}>CPL R$ {cplExibido.toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px' }}>
@@ -838,7 +838,7 @@ export default function Dashboard() {
                 <p style={S.resumoNome}>{m.nome}</p>
                 <div style={S.resumoLinha}><span>Investido Meta</span><span>R$ {m.investimentoMeta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div style={S.resumoLinha}><span>Investido Google</span><span>R$ {m.investimentoGoogle.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                <div style={S.resumoLinha}><span>Leads (anúncios)</span><span>{Math.round(m.leadsAds)}</span></div>
+                <div style={S.resumoLinha}><span>Leads (anúncios)</span><span>{Math.floor(m.leadsAds)}</span></div>
                 <div style={S.resumoDestaque}><span>Gasto total</span><span>R$ {m.gastoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div style={S.resumoDestaque}><span>CPL</span><span>R$ {m.cpl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div style={{ ...S.resumoLinha, marginTop: '8px' }}><span>% avançados</span><span style={{ color: '#4ade80' }}>{m.pctAvancados.toFixed(1)}%</span></div>
@@ -860,7 +860,7 @@ export default function Dashboard() {
               </div>
               <div style={S.card}>
                 <p style={S.cardLabel}>{plataforma === 'meta_ads' ? 'Leads' : 'Conversões'}</p>
-                <p style={S.cardValue}>{Math.round(totalLeads)}</p>
+                <p style={S.cardValue}>{Math.floor(totalLeads)}</p>
               </div>
               <div style={S.cardSOS(totalSOS > 0)}>
                 <p style={S.cardLabelRed}>Clientes S.O.S</p>
