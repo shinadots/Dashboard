@@ -221,9 +221,12 @@ export default function Dashboard() {
     meta_ads: {
       idField: 'conta_fb_id',
       metaField: 'meta_cpl_fb',
-      // Soma leads de formulário nativo/pixel (actions_lead) + conversas de
-      // WhatsApp iniciadas (campanhas de mensagem) — as duas contam como lead.
-      leadsCols: ['actions_lead', 'actions_onsite_conversion_messaging_conversation_started_7d'],
+      // actions_lead conta sempre. O campo de WhatsApp (whatsappCol) só é
+      // somado se o nome da campanha bater com WHATSAPP_CAMPAIGN_REGEX —
+      // campanhas que não são de WhatsApp mas geraram alguma conversa por
+      // engano/orgânico não devem contar como lead de WhatsApp.
+      leadsCols: ['actions_lead'],
+      whatsappCol: 'actions_onsite_conversion_messaging_conversation_started_7d',
       gastoCol: 'spend',
       dataCol: 'date',
     },
@@ -233,20 +236,31 @@ export default function Dashboard() {
       idField: 'conta_google_id',
       metaField: 'meta_cpl_google',
       leadsCols: ['conversions'],
+      whatsappCol: null as string | null,
       gastoCol: 'spend',
       dataCol: 'date',
     },
   } as const;
 
-  // Soma o valor de uma ou mais colunas de "lead" numa linha — meta_ads tem
-  // duas (formulário + WhatsApp), google_ads só uma. Parsing inline (não usa
-  // o `parse` do componente) porque essa função é definida antes dele.
-  const sumLeadsCols = (row: AdsData, cols: readonly string[]) =>
-    cols.reduce((total, col) => {
-      const val = row[col];
+  // Só conta como campanha de WhatsApp se o nome tiver WHATS, WHATSAPP, WPP
+  // (ou variações que contenham esses trechos) — case-insensitive.
+  const WHATSAPP_CAMPAIGN_REGEX = /whats|wpp/i;
+
+  // Soma o valor de uma ou mais colunas de "lead" numa linha, mais o campo de
+  // WhatsApp SE o nome da campanha indicar que é campanha de WhatsApp.
+  // Parsing inline (não usa o `parse` do componente) porque essa função é
+  // definida antes dele.
+  const sumLeadsCols = (row: AdsData, cols: readonly string[], whatsappCol?: string | null) => {
+    const parseVal = (val: any) => {
       const num = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : parseFloat(val);
-      return total + (isNaN(num) ? 0 : num);
-    }, 0);
+      return isNaN(num) ? 0 : num;
+    };
+    let total = cols.reduce((sum, col) => sum + parseVal(row[col]), 0);
+    if (whatsappCol && row.campaign && WHATSAPP_CAMPAIGN_REGEX.test(String(row.campaign))) {
+      total += parseVal(row[whatsappCol]);
+    }
+    return total;
+  };
 
   const [clientesConfig, setClientesConfig] = useState<AdsData[]>([]);
 
@@ -352,13 +366,13 @@ export default function Dashboard() {
   }, [dadosEnriquecidos, gestorAtivo, squadAtivo]);
 
   const todosClientes = useMemo(() => {
-    const { leadsCols, gastoCol } = PLATFORM_CONFIG[plataforma];
+    const { leadsCols, whatsappCol, gastoCol } = PLATFORM_CONFIG[plataforma];
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
     const nomes = [...new Set(dadosFiltrados.map(i => i._cliente?.trim()))].filter(Boolean) as string[];
     return nomes.map(nome => {
       const regs = dadosFiltrados.filter(d => d._cliente?.trim() === nome);
       const gasto = parseFloat(regs.reduce((a, c) => a + parse(c[gastoCol]), 0).toFixed(2));
-      const leads = regs.reduce((a, c) => a + sumLeadsCols(c, leadsCols), 0);
+      const leads = regs.reduce((a, c) => a + sumLeadsCols(c, leadsCols, whatsappCol), 0);
       const meta = regs[0]._meta ?? 0;
       // Sem leads: CPL vira o próprio valor gasto (não zero) — assim o card
       // continua sinalizando estouro de meta mesmo sem nenhum lead registrado.
@@ -369,7 +383,7 @@ export default function Dashboard() {
 
   const dadosPorDia = useMemo(() => {
     if (!clienteSelecionado) return [];
-    const { leadsCols, gastoCol, dataCol } = PLATFORM_CONFIG[plataforma];
+    const { leadsCols, whatsappCol, gastoCol, dataCol } = PLATFORM_CONFIG[plataforma];
     const parse = (val: any) => { if (typeof val === 'string') return parseFloat(val.replace(',', '.')) || 0; return parseFloat(val) || 0; };
     const registros = dadosFiltrados.filter(d => d._cliente?.trim() === clienteSelecionado);
     const agrupado: Record<string, { data: string; gasto: number; leads: number }> = {};
@@ -378,7 +392,7 @@ export default function Dashboard() {
       if (!dia) return;
       if (!agrupado[dia]) agrupado[dia] = { data: dia, gasto: 0, leads: 0 };
       agrupado[dia].gasto += parse(r[gastoCol]);
-      agrupado[dia].leads += sumLeadsCols(r, leadsCols);
+      agrupado[dia].leads += sumLeadsCols(r, leadsCols, whatsappCol);
     });
     return Object.values(agrupado)
       .map(d => ({ ...d, cpl: parseFloat((d.leads > 0 ? d.gasto / d.leads : d.gasto).toFixed(2)) }))
@@ -392,7 +406,7 @@ export default function Dashboard() {
     : dadosFiltrados.reduce((a, c) => a + parse(c[PLATFORM_CONFIG[plataforma].gastoCol]), 0);
   const totalLeads = clienteSelecionado
     ? dadosPorDia.reduce((a, c) => a + c.leads, 0)
-    : dadosFiltrados.reduce((a, c) => a + sumLeadsCols(c, PLATFORM_CONFIG[plataforma].leadsCols), 0);
+    : dadosFiltrados.reduce((a, c) => a + sumLeadsCols(c, PLATFORM_CONFIG[plataforma].leadsCols, PLATFORM_CONFIG[plataforma].whatsappCol), 0);
   const totalSOS = todosClientes.filter(c => c.estourouMeta).length;
 
   const dadosGrafico = clienteSelecionado
@@ -625,7 +639,7 @@ export default function Dashboard() {
       if (!config) return;
       const m = get(config.cliente);
       m.investimentoMeta += parseNum(row.spend);
-      m.leadsMeta += sumLeadsCols(row, PLATFORM_CONFIG.meta_ads.leadsCols);
+      m.leadsMeta += sumLeadsCols(row, PLATFORM_CONFIG.meta_ads.leadsCols, PLATFORM_CONFIG.meta_ads.whatsappCol);
     });
 
     resumoGoogle.forEach(row => {
@@ -633,7 +647,7 @@ export default function Dashboard() {
       if (!config) return;
       const m = get(config.cliente);
       m.investimentoGoogle += parseNum(row.spend);
-      m.leadsGoogle += sumLeadsCols(row, PLATFORM_CONFIG.google_ads.leadsCols);
+      m.leadsGoogle += sumLeadsCols(row, PLATFORM_CONFIG.google_ads.leadsCols, PLATFORM_CONFIG.google_ads.whatsappCol);
     });
 
     resumoCrm.forEach(row => {
