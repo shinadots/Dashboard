@@ -323,7 +323,7 @@ export default function Dashboard() {
         let query = supabase.from(plataforma).select('*').not('account_id', 'is', null);
         if (rangeInicio) query = query.gte(dataCol, rangeInicio);
         if (rangeFimExclusivo) query = query.lt(dataCol, rangeFimExclusivo);
-        const { data: adsData, error } = await query.range(from, from + pageSize - 1);
+        const { data: adsData, error } = await query.order('date', { ascending: true }).range(from, from + pageSize - 1);
         if (error) { hasMore = false; }
         else if (adsData && adsData.length > 0) {
           allData = [...allData, ...adsData];
@@ -485,7 +485,7 @@ export default function Dashboard() {
             `and(updated_at.gte.${rangeInicio},updated_at.lt.${rangeFimExclusivo})`
           );
         }
-        const { data, error } = await query.range(from, from + pageSize - 1);
+        const { data, error } = await query.order('id', { ascending: true }).range(from, from + pageSize - 1);
         if (error || !data || data.length === 0) { hasMore = false; }
         else { all = [...all, ...data]; if (data.length < pageSize) hasMore = false; else page++; }
       }
@@ -594,7 +594,7 @@ export default function Dashboard() {
         let query = supabase.from(tabela).select('*').not('account_id', 'is', null);
         if (rangeInicio) query = query.gte('date', rangeInicio);
         if (rangeFimExclusivo) query = query.lt('date', rangeFimExclusivo);
-        const { data, error } = await query.range(from, from + pageSize - 1);
+        const { data, error } = await query.order('date', { ascending: true }).range(from, from + pageSize - 1);
         if (error || !data || data.length === 0) { hasMore = false; }
         else { all = [...all, ...data]; if (data.length < pageSize) hasMore = false; else page++; }
       }
@@ -618,7 +618,7 @@ export default function Dashboard() {
         let crmQuery = supabase.from('crm_leads').select('*');
         if (rangeInicio) crmQuery = crmQuery.gte('created_at', rangeInicio);
         if (rangeFimExclusivo) crmQuery = crmQuery.lt('created_at', rangeFimExclusivo);
-        const { data, error } = await crmQuery.range(from, from + crmPageSize - 1);
+        const { data, error } = await crmQuery.order('id', { ascending: true }).range(from, from + crmPageSize - 1);
         if (error || !data || data.length === 0) { crmHasMore = false; }
         else { crmAll = [...crmAll, ...data]; if (data.length < crmPageSize) crmHasMore = false; else crmPage++; }
       }
@@ -748,7 +748,7 @@ export default function Dashboard() {
               `and(updated_at.gte.${rangeInicio},updated_at.lt.${rangeFimExclusivo})`
             );
           }
-          const { data, error } = await query.range(from, from + pageSize - 1);
+          const { data, error } = await query.order('id', { ascending: true }).range(from, from + pageSize - 1);
           if (error || !data || data.length === 0) { hasMore = false; }
           else { all = [...all, ...data]; if (data.length < pageSize) hasMore = false; else page++; }
         }
