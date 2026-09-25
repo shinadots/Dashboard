@@ -57,6 +57,10 @@ const S = {
   resumoNome: { fontSize: '11px', fontWeight: 900, color: '#c084fc', textTransform: 'uppercase' as const, marginBottom: '10px' },
   resumoLinha: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#e9d5ff', marginBottom: '4px' },
   resumoDestaque: { display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 800, color: '#fff', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(168,85,247,0.15)' },
+  modalBackdrop: { position: 'fixed' as const, inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', zIndex: 50 },
+  modalCard: { backgroundColor: '#1a0b2e', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '2rem', padding: '32px', maxWidth: '1000px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const },
+  modalClose: { background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(168,85,247,0.4)', borderRadius: '8px', color: '#c084fc', fontSize: '14px', fontWeight: 700, padding: '4px 12px', cursor: 'pointer' },
+  modalGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' },
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -702,6 +706,87 @@ export default function Dashboard() {
     });
   }, [resumoPorMarca, clientesConfig, gestorAtivo, squadAtivo]);
 
+  // ─── Card expandido do Compilado Geral (clique numa marca) ─────────────
+  const pipelinesPorCliente = useMemo(() => {
+    const map = new Map<string, { crm: string; pipeline_name: string }[]>();
+    pipelineCliente.forEach(row => {
+      const arr = map.get(row.cliente) ?? [];
+      arr.push({ crm: row.crm, pipeline_name: row.pipeline_name });
+      map.set(row.cliente, arr);
+    });
+    return map;
+  }, [pipelineCliente]);
+
+  const [marcaExpandida, setMarcaExpandida] = useState<string | null>(null);
+  const [expandidaLoading, setExpandidaLoading] = useState(false);
+  const [expandidaLeads, setExpandidaLeads] = useState<AdsData[]>([]);
+
+  useEffect(() => {
+    if (!marcaExpandida) { setExpandidaLeads([]); return; }
+
+    async function fetchExpandida() {
+      setExpandidaLoading(true);
+      const pipelines = pipelinesPorCliente.get(marcaExpandida as string) ?? [];
+      const porCrm = new Map<string, string[]>();
+      pipelines.forEach(p => {
+        const arr = porCrm.get(p.crm) ?? [];
+        arr.push(p.pipeline_name);
+        porCrm.set(p.crm, arr);
+      });
+
+      let all: AdsData[] = [];
+      for (const [crm, pipelineNames] of porCrm.entries()) {
+        let hasMore = true;
+        let page = 0;
+        const pageSize = 1000;
+        while (hasMore) {
+          const from = page * pageSize;
+          let query = supabase.from('crm_leads').select('*').eq('crm', crm).in('pipeline_name', pipelineNames);
+          if (rangeInicio && rangeFimExclusivo) {
+            query = query.or(
+              `and(created_at.gte.${rangeInicio},created_at.lt.${rangeFimExclusivo}),` +
+              `and(updated_at.gte.${rangeInicio},updated_at.lt.${rangeFimExclusivo})`
+            );
+          }
+          const { data, error } = await query.range(from, from + pageSize - 1);
+          if (error || !data || data.length === 0) { hasMore = false; }
+          else { all = [...all, ...data]; if (data.length < pageSize) hasMore = false; else page++; }
+        }
+      }
+      setExpandidaLeads(all);
+      setExpandidaLoading(false);
+    }
+    fetchExpandida();
+  }, [marcaExpandida, pipelinesPorCliente, rangeInicio, rangeFimExclusivo]);
+
+  const expandidaAgrupada = useMemo(() => {
+    const agrupaPorStatus = (rows: AdsData[]) => {
+      const porStatus: Record<string, number> = {};
+      rows.forEach(r => {
+        const nome = r.status_name?.trim() || 'Sem status';
+        porStatus[nome] = (porStatus[nome] ?? 0) + 1;
+      });
+      return Object.entries(porStatus)
+        .map(([nome, leads]) => ({ nome, leads }))
+        .sort((a, b) => b.leads - a.leads);
+    };
+
+    const criados: AdsData[] = [];
+    const atualizados: AdsData[] = [];
+    expandidaLeads.forEach(row => {
+      const criadoNoPeriodo = !!(rangeInicio && rangeFimExclusivo && row.created_at >= rangeInicio && row.created_at < rangeFimExclusivo);
+      if (criadoNoPeriodo) criados.push(row);
+      else atualizados.push(row); // entrou pelo OR, então foi atualizado no período (não criado)
+    });
+
+    return {
+      criados: agrupaPorStatus(criados),
+      atualizados: agrupaPorStatus(atualizados),
+      totalCriados: criados.length,
+      totalAtualizados: atualizados.length,
+    };
+  }, [expandidaLeads, rangeInicio, rangeFimExclusivo]);
+
   if (!isMounted) return null;
 
   return (
@@ -854,7 +939,11 @@ export default function Dashboard() {
 
           <div style={S.resumoGrid}>
             {resumoFiltrado.map(m => (
-              <div key={m.nome} style={S.resumoCard(m.pctPerdidos >= 50)}>
+              <div
+                key={m.nome}
+                style={{ ...S.resumoCard(m.pctPerdidos >= 50), cursor: 'pointer' }}
+                onClick={() => setMarcaExpandida(m.nome)}
+              >
                 <p style={S.resumoNome}>{m.nome}</p>
                 <div style={S.resumoLinha}><span>Investido Meta</span><span>R$ {m.investimentoMeta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div style={S.resumoLinha}><span>Investido Google</span><span>R$ {m.investimentoGoogle.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
@@ -868,6 +957,61 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+        )}
+
+        {marcaExpandida && (
+          <div style={S.modalBackdrop} onClick={() => setMarcaExpandida(null)}>
+            <div style={S.modalCard} onClick={e => e.stopPropagation()}>
+              <div style={S.funilHeader}>
+                <h3 style={S.chartTitle}>🧭 {marcaExpandida}</h3>
+                <button onClick={() => setMarcaExpandida(null)} style={S.modalClose}>✕</button>
+              </div>
+
+              {expandidaLoading && <p style={S.loading}>CARREGANDO...</p>}
+
+              {!expandidaLoading && (
+                <div style={S.modalGrid}>
+                  <div style={S.pipelineCard}>
+                    <p style={S.pipelineTitle}>Leads criados no período</p>
+                    <p style={S.pipelineTotal}>{expandidaAgrupada.totalCriados} leads</p>
+                    {expandidaAgrupada.criados.length === 0 && (
+                      <p style={{ color: '#a855f7', fontSize: '11px' }}>Nenhum lead criado nesse período.</p>
+                    )}
+                    {expandidaAgrupada.criados.map(s => (
+                      <div key={s.nome} style={S.statusRow}>
+                        <div style={S.statusLabel}>
+                          <span>{s.nome}</span>
+                          <span>{s.leads} · {expandidaAgrupada.totalCriados > 0 ? ((s.leads / expandidaAgrupada.totalCriados) * 100).toFixed(1) : '0'}%</span>
+                        </div>
+                        <div style={S.statusBarTrack}>
+                          <div style={S.statusBarFill(expandidaAgrupada.totalCriados > 0 ? (s.leads / expandidaAgrupada.totalCriados) * 100 : 0)} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={S.pipelineCard}>
+                    <p style={S.pipelineTitle}>Leads atualizados no período</p>
+                    <p style={S.pipelineTotal}>{expandidaAgrupada.totalAtualizados} leads (já existiam antes, mudaram de etapa)</p>
+                    {expandidaAgrupada.atualizados.length === 0 && (
+                      <p style={{ color: '#a855f7', fontSize: '11px' }}>Nenhum lead atualizado nesse período.</p>
+                    )}
+                    {expandidaAgrupada.atualizados.map(s => (
+                      <div key={s.nome} style={S.statusRow}>
+                        <div style={S.statusLabel}>
+                          <span>{s.nome}</span>
+                          <span>{s.leads} · {expandidaAgrupada.totalAtualizados > 0 ? ((s.leads / expandidaAgrupada.totalAtualizados) * 100).toFixed(1) : '0'}%</span>
+                        </div>
+                        <div style={S.statusBarTrack}>
+                          <div style={S.statusBarFill(expandidaAgrupada.totalAtualizados > 0 ? (s.leads / expandidaAgrupada.totalAtualizados) * 100 : 0)} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {abaAtiva === 'anuncios' && (
