@@ -468,15 +468,24 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchFunil() {
       setFunilLoading(true);
-      let query = supabase.from('crm_leads').select('*').eq('crm', funilCrm);
-      if (rangeInicio && rangeFimExclusivo) {
-        query = query.or(
-          `and(created_at.gte.${rangeInicio},created_at.lt.${rangeFimExclusivo}),` +
-          `and(updated_at.gte.${rangeInicio},updated_at.lt.${rangeFimExclusivo})`
-        );
+      let all: AdsData[] = [];
+      let hasMore = true;
+      let page = 0;
+      const pageSize = 1000;
+      while (hasMore) {
+        const from = page * pageSize;
+        let query = supabase.from('crm_leads').select('*').eq('crm', funilCrm);
+        if (rangeInicio && rangeFimExclusivo) {
+          query = query.or(
+            `and(created_at.gte.${rangeInicio},created_at.lt.${rangeFimExclusivo}),` +
+            `and(updated_at.gte.${rangeInicio},updated_at.lt.${rangeFimExclusivo})`
+          );
+        }
+        const { data, error } = await query.range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) { hasMore = false; }
+        else { all = [...all, ...data]; if (data.length < pageSize) hasMore = false; else page++; }
       }
-      const { data: rows, error } = await query;
-      setFunilData(error ? [] : (rows ?? []));
+      setFunilData(all);
       setFunilLoading(false);
     }
     fetchFunil();
@@ -593,15 +602,26 @@ export default function Dashboard() {
       const [meta, google] = await Promise.all([fetchAdsTabela('meta_ads'), fetchAdsTabela('google_ads')]);
 
       // Aqui é "criado no período" de verdade (created_at), diferente do
-      // funilData lá em cima que também considera updated_at.
-      let crmQuery = supabase.from('crm_leads').select('*');
-      if (rangeInicio) crmQuery = crmQuery.gte('created_at', rangeInicio);
-      if (rangeFimExclusivo) crmQuery = crmQuery.lt('created_at', rangeFimExclusivo);
-      const { data: crm } = await crmQuery;
+      // funilData lá em cima que também considera updated_at. Precisa paginar
+      // igual o fetchAdsTabela — sem isso o Supabase corta em 1000 linhas por
+      // padrão, e a crm_leads já passa de 47 mil registros no total.
+      let crmAll: AdsData[] = [];
+      let crmHasMore = true;
+      let crmPage = 0;
+      const crmPageSize = 1000;
+      while (crmHasMore) {
+        const from = crmPage * crmPageSize;
+        let crmQuery = supabase.from('crm_leads').select('*');
+        if (rangeInicio) crmQuery = crmQuery.gte('created_at', rangeInicio);
+        if (rangeFimExclusivo) crmQuery = crmQuery.lt('created_at', rangeFimExclusivo);
+        const { data, error } = await crmQuery.range(from, from + crmPageSize - 1);
+        if (error || !data || data.length === 0) { crmHasMore = false; }
+        else { crmAll = [...crmAll, ...data]; if (data.length < crmPageSize) crmHasMore = false; else crmPage++; }
+      }
 
       setResumoMeta(meta);
       setResumoGoogle(google);
-      setResumoCrm(crm ?? []);
+      setResumoCrm(crmAll);
       setResumoLoading(false);
     }
     fetchResumo();
